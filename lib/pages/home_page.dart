@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:palee_web_portfolio/auth/login_page.dart';
 import 'package:palee_web_portfolio/pages/sections/about_us_section.dart';
 import 'package:palee_web_portfolio/pages/sections/achievements_section.dart';
 import 'package:palee_web_portfolio/pages/sections/contact_section.dart';
@@ -85,12 +84,6 @@ class _HomePageState extends State<HomePage> {
                       _scrollToSection(_achievementsKey),
                   onAboutPressed: () => _scrollToSection(_aboutKey),
                   onContactPressed: () => _scrollToSection(_contactKey),
-                  onLoginPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (c) => const LoginPage()),
-                    );
-                  },
                   onMenuPressed: () => AppNavigationBar.showMobileMenu(
                     context,
                     onHomePressed: () => _scrollToSection(_homeKey),
@@ -99,12 +92,6 @@ class _HomePageState extends State<HomePage> {
                         _scrollToSection(_achievementsKey),
                     onAboutPressed: () => _scrollToSection(_aboutKey),
                     onContactPressed: () => _scrollToSection(_contactKey),
-                    onLoginPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (c) => const LoginPage()),
-                      );
-                    },
                   ),
                 ),
               ),

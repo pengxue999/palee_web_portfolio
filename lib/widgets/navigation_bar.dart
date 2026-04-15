@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:palee_web_portfolio/auth/login_page.dart';
 import 'package:palee_web_portfolio/utils/responsive_helper.dart';
 
 /// Navigation bar widget for the home page
@@ -10,7 +9,6 @@ class AppNavigationBar extends StatelessWidget {
   final VoidCallback onAchievementsPressed;
   final VoidCallback onAboutPressed;
   final VoidCallback onContactPressed;
-  final VoidCallback onLoginPressed;
   final VoidCallback onMenuPressed;
 
   const AppNavigationBar({
@@ -21,7 +19,6 @@ class AppNavigationBar extends StatelessWidget {
     required this.onAchievementsPressed,
     required this.onAboutPressed,
     required this.onContactPressed,
-    required this.onLoginPressed,
     required this.onMenuPressed,
   });
 
@@ -62,8 +59,6 @@ class AppNavigationBar extends StatelessWidget {
           _buildNavButton(context, 'ກ່ຽວກັບພວກເຮົາ', onAboutPressed),
           _buildNavButton(context, 'ຕິດຕໍ່', onContactPressed),
           const SizedBox(width: 16),
-          _buildLoginButton(context),
-          const SizedBox(width: 16),
         ],
       ],
     );
@@ -92,31 +87,6 @@ class AppNavigationBar extends StatelessWidget {
     );
   }
 
-  Widget _buildLoginButton(BuildContext context) {
-    return ElevatedButton(
-      onPressed: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (c) => const LoginPage()),
-        );
-      },
-      style: ElevatedButton.styleFrom(backgroundColor: Colors.white),
-      child: Text(
-        'ເຂົ້າສູ່ລະບົບ',
-        style: TextStyle(
-          color: Colors.black,
-          fontSize: ResponsiveHelper.getResponsiveFontSize(
-            context,
-            mobile: 14,
-            tablet: 15,
-            desktop: 16,
-          ),
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-
   /// Show mobile menu bottom sheet
   /// Show modern mobile menu bottom sheet
   static void showMobileMenu(
@@ -126,7 +96,6 @@ class AppNavigationBar extends StatelessWidget {
     required VoidCallback onAchievementsPressed,
     required VoidCallback onAboutPressed,
     required VoidCallback onContactPressed,
-    required VoidCallback onLoginPressed,
   }) {
     showModalBottomSheet(
       context: context,
@@ -175,7 +144,10 @@ class AppNavigationBar extends StatelessWidget {
                       icon: const Icon(Icons.close, color: Colors.grey),
                       onPressed: () => Navigator.pop(context),
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
+                      constraints: const BoxConstraints(
+                        minWidth: 40,
+                        minHeight: 40,
+                      ),
                     ),
                   ],
                 ),
@@ -220,46 +192,6 @@ class AppNavigationBar extends StatelessWidget {
                         onPressed: onContactPressed,
                       ),
                     ],
-                  ),
-                ),
-              ),
-
-              // Login button
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  border: Border(top: BorderSide(color: Colors.grey.shade200)),
-                ),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      onLoginPressed();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue.shade700,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.login_rounded, size: 20),
-                        SizedBox(width: 8),
-                        Text(
-                          'ເຂົ້າສູ່ລະບົບ',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
                 ),
               ),

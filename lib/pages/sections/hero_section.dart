@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:palee_web_portfolio/auth/register_page.dart';
+import 'package:palee_web_portfolio/pages/register_page.dart';
 import 'package:palee_web_portfolio/utils/responsive_helper.dart';
 import 'package:palee_web_portfolio/widgets/animated_section.dart';
 import 'package:palee_web_portfolio/widgets/typing_text.dart';
@@ -262,8 +262,18 @@ class HeroSection extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            Icon(
+                              Icons.arrow_forward,
+                              size: ResponsiveHelper.getResponsiveFontSize(
+                                context,
+                                mobile: 20,
+                                tablet: 22,
+                                desktop: 24,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
                             Text(
-                              'ສະໝັກດຽວນີ້',
+                              'ລົງທະບຽນ',
                               style: TextStyle(
                                 fontSize:
                                     ResponsiveHelper.getResponsiveFontSize(
@@ -274,16 +284,6 @@ class HeroSection extends StatelessWidget {
                                     ),
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 1,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Icon(
-                              Icons.arrow_forward,
-                              size: ResponsiveHelper.getResponsiveFontSize(
-                                context,
-                                mobile: 20,
-                                tablet: 22,
-                                desktop: 24,
                               ),
                             ),
                           ],
