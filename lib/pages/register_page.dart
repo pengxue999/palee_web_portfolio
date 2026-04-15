@@ -1,4 +1,7 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:palee_web_portfolio/models/discount_model.dart';
 import 'package:palee_web_portfolio/models/fee_model.dart';
@@ -12,7 +15,7 @@ import 'package:palee_web_portfolio/providers/fee_provider.dart';
 import 'package:palee_web_portfolio/providers/province_provider.dart';
 import 'package:palee_web_portfolio/providers/registration_provider.dart';
 import 'package:palee_web_portfolio/providers/student_provider.dart';
-import 'package:palee_web_portfolio/utils/responsive_helper.dart';
+import 'package:palee_web_portfolio/utils/registration_receipt_downloader.dart';
 import 'package:palee_web_portfolio/widgets/app_text_field.dart';
 import 'package:palee_web_portfolio/widgets/app_dropdown_field.dart';
 import 'package:palee_web_portfolio/widgets/fee_selection_widget.dart';
@@ -20,10 +23,8 @@ import 'package:palee_web_portfolio/models/province_model.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const _navy = Color(0xFF0F1629);
-const _navyMid = Color(0xFF1A2340);
 const _navyLight = Color(0xFF243052);
 const _accent = Color(0xFF4F7EFF);
-const _accentGlow = Color(0x334F7EFF);
 const _accentSoft = Color(0xFFEEF3FF);
 const _gold = Color(0xFFF5C842);
 const _surface = Color(0xFFFAFBFF);
@@ -32,6 +33,36 @@ const _textPrimary = Color(0xFF111827);
 const _textSecondary = Color(0xFF6B7497);
 const _errorColor = Color(0xFFEF4444);
 const _successColor = Color(0xFF22C55E);
+
+class _PhoneNumberLengthFormatter extends TextInputFormatter {
+  const _PhoneNumberLengthFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final maxLength = _maxLengthFor(digits);
+
+    if (digits.length <= maxLength) {
+      return newValue.copyWith(text: digits);
+    }
+
+    final truncated = digits.substring(0, maxLength);
+    return TextEditingValue(
+      text: truncated,
+      selection: TextSelection.collapsed(offset: truncated.length),
+    );
+  }
+
+  int _maxLengthFor(String value) {
+    if (value.startsWith('030') || value.startsWith('03')) {
+      return 10;
+    }
+    return 11;
+  }
+}
 
 class RegisterPage extends ConsumerStatefulWidget {
   const RegisterPage({super.key});
@@ -42,6 +73,8 @@ class RegisterPage extends ConsumerStatefulWidget {
 
 class _RegisterPageState extends ConsumerState<RegisterPage>
     with TickerProviderStateMixin {
+  static const _phoneNumberFormatter = _PhoneNumberLengthFormatter();
+
   final _formKey = GlobalKey<FormState>();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
@@ -54,9 +87,15 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
   String? _selectedDistrict;
   String? _selectedDormitory;
   bool _isLoading = false;
+  bool _isDownloadingReceipt = false;
   int _currentStep = 0;
   String? _savedStudentId;
   String? _lastShownError;
+  String _progressOverlayTitle = 'ກຳລັງດາວໂຫຼດໃບລົງທະບຽນ';
+  String _progressOverlayMessage =
+      'ກະລຸນາລໍຖ້າຊົ່ວຄາວ. ລະບົບກຳລັງສ້າງ ແລະ ບັນທຶກ PDF ເຂົ້າເຄື່ອງຂອງທ່ານ.';
+  String? _downloadReceiptRegistrationId;
+  String? _downloadReceiptStudentName;
   Map<String, String> _scholarshipStatusByFee = <String, String>{};
 
   Set<String> _selectedFeeIds = <String>{};
@@ -65,7 +104,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
   late final AnimationController _stepController;
   late final Animation<double> _pageFade;
   late final Animation<Offset> _pageSlide;
-  late final Animation<double> _stepProgress;
 
   final List<String> _dormitories = ['ຫໍພັກໃນ', 'ຫໍພັກນອກ'];
 
@@ -99,10 +137,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
         .animate(
           CurvedAnimation(parent: _pageController, curve: Curves.easeOutCubic),
         );
-    _stepProgress = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _stepController, curve: Curves.easeInOut),
-    );
-
     _pageController.forward();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -156,6 +190,59 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
     if (_lastShownError == msg) return;
     _lastShownError = msg;
     _showSnack(msg, isError: true);
+  }
+
+  bool _isServiceUnavailableError(String? error) {
+    if (error == null || error.trim().isEmpty) {
+      return false;
+    }
+
+    final normalized = error.toLowerCase();
+    return normalized.contains('ບໍ່ສາມາດເຊື່ອມຕໍ່') ||
+        normalized.contains('api service') ||
+        normalized.contains('server') ||
+        normalized.contains('ເຊີບເວີ') ||
+        normalized.contains('timeout') ||
+        normalized.contains('timed out') ||
+        normalized.contains('xmlhttprequest') ||
+        normalized.contains('clientexception') ||
+        normalized.contains('[500]') ||
+        normalized.contains('[502]') ||
+        normalized.contains('[503]') ||
+        normalized.contains('[504]');
+  }
+
+  bool _hasCriticalServiceIssue({
+    required String? provinceError,
+    required List<ProvinceModel> provinces,
+    required String? feeError,
+    required List<FeeModel> fees,
+  }) {
+    final provinceUnavailable =
+        provinces.isEmpty && _isServiceUnavailableError(provinceError);
+    final feeUnavailable = fees.isEmpty && _isServiceUnavailableError(feeError);
+    return provinceUnavailable || feeUnavailable;
+  }
+
+  String _serviceIssueMessage({String? provinceError, String? feeError}) {
+    if (_isServiceUnavailableError(feeError)) {
+      return 'Server ຫຼື API service ບໍ່ພ້ອມໃຊ້ງານ.';
+    }
+
+    if (_isServiceUnavailableError(provinceError)) {
+      return 'Server ຫຼື API service ບໍ່ພ້ອມໃຊ້ງານ.';
+    }
+
+    return 'ບໍ່ສາມາດໂຫຼດຂໍ້ມູນສຳລັບໜ້ານີ້ໄດ້. ກະລຸນາລອງໃໝ່ອີກຄັ້ງ.';
+  }
+
+  Future<void> _retryInitialDependencies() async {
+    ref.read(districtProvider.notifier).clearDistricts();
+    await Future.wait<void>([
+      ref.read(provinceProvider.notifier).getProvinces(),
+      ref.read(feeProvider.notifier).getFees(),
+      ref.read(discountProvider.notifier).getDiscounts(),
+    ]);
   }
 
   Map<String, String> _selectedSubjectSummary(List<FeeModel> fees) {
@@ -338,15 +425,365 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
     }
   }
 
-  Future<void> _handleRegister() async {
+  bool _validateRegistrationPrerequisites() {
     if (_savedStudentId == null) {
       _showSnack('ກະລຸນາບັນທຶກຂໍ້ມູນນັກຮຽນກ່ອນ', isError: true);
-      return;
+      return false;
     }
     if (_selectedFeeIds.isEmpty) {
       _showSnack('ກະລຸນາເລືອກຢ່າງໜ້ອຍ 1 ວິຊາ', isError: true);
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> _confirmAndHandleRegister() async {
+    if (!_validateRegistrationPrerequisites()) {
       return;
     }
+
+    final confirmed = await _showRegisterConfirmationDialog();
+    if (!mounted || !confirmed) {
+      return;
+    }
+
+    await _handleRegister();
+  }
+
+  Future<bool> _showRegisterConfirmationDialog() async {
+    final selectedFees = ref
+        .read(feeProvider)
+        .fees
+        .where((fee) => _selectedFeeIds.contains(fee.feeId))
+        .toList();
+
+    return await showGeneralDialog<bool>(
+          context: context,
+          barrierLabel: 'register-confirmation',
+          barrierDismissible: true,
+          barrierColor: Colors.black.withValues(alpha: 0.34),
+          transitionDuration: const Duration(milliseconds: 220),
+          pageBuilder: (dialogContext, _, __) {
+            return SafeArea(
+              child: Material(
+                type: MaterialType.transparency,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                        child: const SizedBox.expand(),
+                      ),
+                    ),
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 460),
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(28),
+                              border: Border.all(
+                                color: _border.withValues(alpha: 0.9),
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _navy.withValues(alpha: 0.12),
+                                  blurRadius: 34,
+                                  offset: const Offset(0, 20),
+                                ),
+                              ],
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                24,
+                                24,
+                                24,
+                                20,
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    width: 58,
+                                    height: 58,
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [_accent, Color(0xFF7AA2FF)],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(18),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: _accent.withValues(
+                                            alpha: 0.28,
+                                          ),
+                                          blurRadius: 24,
+                                          offset: const Offset(0, 12),
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                      Icons.task_alt_rounded,
+                                      color: Colors.white,
+                                      size: 30,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 18),
+                                  const Text(
+                                    'ຢືນຢັນການລົງທະບຽນ',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w800,
+                                      color: _textPrimary,
+                                      letterSpacing: -0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'ກະລຸນາກວດສອບຂໍ້ມູນອີກຄັ້ງ. ຖ້າຢືນຢັນແລ້ວ ລະບົບຈະບັນທຶກ ແລະ ດາວໂຫຼດໃບລົງທະບຽນໃຫ້ທັນທີ.',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      height: 1.6,
+                                      color: _textSecondary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 18),
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF8FAFF),
+                                      borderRadius: BorderRadius.circular(18),
+                                      border: Border.all(color: _border),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        _buildDialogInfoRow(
+                                          'ຊື່ ແລະ ນາມສະກຸມ',
+                                          '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'
+                                              .trim(),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        _buildDialogInfoRow(
+                                          'ຈຳນວນວິຊາ',
+                                          '${selectedFees.length} ວິຊາ',
+                                        ),
+
+                                        const SizedBox(height: 12),
+                                        _buildDialogInfoRow(
+                                          'ຍອດຊຳລະສຸດທ້າຍ',
+                                          '${_formatCurrency(_netFee)} ກີບ',
+                                          isHighlighted: true,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (selectedFees.isNotEmpty) ...[
+                                    const SizedBox(height: 16),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: selectedFees
+                                          .map(
+                                            (fee) => Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 8,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: _accentSoft,
+                                                borderRadius:
+                                                    BorderRadius.circular(999),
+                                              ),
+                                              child: Text(
+                                                '${fee.subjectName} ${fee.levelName}',
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: _accent,
+                                                ),
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 24),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: SizedBox(
+                                          height: 50,
+                                          child: OutlinedButton(
+                                            onPressed: () => Navigator.of(
+                                              dialogContext,
+                                            ).pop(false),
+                                            style: OutlinedButton.styleFrom(
+                                              side: const BorderSide(
+                                                color: _border,
+                                                width: 1.5,
+                                              ),
+                                              foregroundColor: _textSecondary,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
+                                              ),
+                                            ),
+                                            child: const Text(
+                                              'ຍົກເລີກ',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: SizedBox(
+                                          height: 50,
+                                          child: ElevatedButton(
+                                            onPressed: () => Navigator.of(
+                                              dialogContext,
+                                            ).pop(true),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: _accent,
+                                              foregroundColor: Colors.white,
+                                              elevation: 0,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
+                                              ),
+                                            ),
+                                            child: const Text(
+                                              'ຢືນຢັນ ແລະ ລົງທະບຽນ',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+          transitionBuilder: (context, animation, _, child) {
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            );
+            return FadeTransition(
+              opacity: curved,
+              child: ScaleTransition(
+                scale: Tween<double>(begin: 0.96, end: 1).animate(curved),
+                child: child,
+              ),
+            );
+          },
+        ) ??
+        false;
+  }
+
+  Widget _buildDialogInfoRow(
+    String label,
+    String value, {
+    bool isHighlighted = false,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: _textSecondary,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: isHighlighted ? 15 : 14,
+              fontWeight: isHighlighted ? FontWeight.w800 : FontWeight.w700,
+              color: isHighlighted ? _accent : _textPrimary,
+              height: 1.4,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _setReceiptDownloadOverlay({
+    required bool isVisible,
+    String? title,
+    String? message,
+    String? registrationId,
+    String? studentName,
+  }) {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isDownloadingReceipt = isVisible;
+      _progressOverlayTitle = title ?? _progressOverlayTitle;
+      _progressOverlayMessage = message ?? _progressOverlayMessage;
+      _downloadReceiptRegistrationId = isVisible
+          ? registrationId
+          : _downloadReceiptRegistrationId;
+      _downloadReceiptStudentName = isVisible
+          ? studentName
+          : _downloadReceiptStudentName;
+
+      if (!isVisible) {
+        _progressOverlayTitle = 'ກຳລັງດາວໂຫຼດໃບລົງທະບຽນ';
+        _progressOverlayMessage =
+            'ກະລຸນາລໍຖ້າຊົ່ວຄາວ. ລະບົບກຳລັງສ້າງ ແລະ ບັນທຶກ ໃບລົງທະບຽນ ເຂົ້າເຄື່ອງຂອງທ່ານ.';
+        _downloadReceiptRegistrationId = null;
+        _downloadReceiptStudentName = null;
+      }
+    });
+  }
+
+  Future<void> _handleRegister() async {
+    if (!_validateRegistrationPrerequisites()) {
+      return;
+    }
+
+    _setReceiptDownloadOverlay(
+      isVisible: true,
+      title: 'ກຳລັງບັນທຶກການລົງທະບຽນ',
+      message:
+          'ກະລຸນາລໍຖ້າຊົ່ວຄາວ. ລະບົບກຳລັງກວດສອບ ແລະ ບັນທຶກຂໍ້ມູນລົງທະບຽນຂອງທ່ານ.',
+      studentName:
+          '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'
+              .trim(),
+    );
+    await WidgetsBinding.instance.endOfFrame;
+    await Future<void>.delayed(const Duration(milliseconds: 16));
+
     setState(() => _isLoading = true);
 
     try {
@@ -377,6 +814,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
       }
 
       if (!success) {
+        _setReceiptDownloadOverlay(isVisible: false);
         setState(() => _isLoading = false);
         _showSnack(
           _errMsg(
@@ -392,12 +830,77 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
           ref.read(registrationProvider).registrations.isNotEmpty
           ? ref.read(registrationProvider).registrations.last
           : null;
+      final selectedFees = ref
+          .read(feeProvider)
+          .fees
+          .where((fee) => _selectedFeeIds.contains(fee.feeId))
+          .toList();
       final selectedSummary = _selectedSubjectSummary(
         ref.read(feeProvider).fees,
       );
+      final receiptRegistrationId =
+          (lastRegistration?.registrationId.isNotEmpty ?? false)
+          ? lastRegistration!.registrationId
+          : 'R${DateTime.now().millisecondsSinceEpoch}';
+      final receiptRegistrationDate =
+          DateTime.tryParse(lastRegistration?.registrationDate ?? '') ??
+          request.registrationDate;
+      final receiptStudentName =
+          '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'
+              .trim();
 
       setState(() => _isLoading = false);
-      _showSnack('ລົງທະບຽນສຳເລັດ ✓', isError: false);
+      try {
+        _setReceiptDownloadOverlay(
+          isVisible: true,
+          title: 'ກຳລັງດາວໂຫຼດໃບລົງທະບຽນ',
+          message:
+              'ກະລຸນາລໍຖ້າຊົ່ວຄາວ. ລະບົບກຳລັງສ້າງ PDF ແລະ ບັນທຶກເຂົ້າເຄື່ອງຂອງທ່ານ.',
+          registrationId: receiptRegistrationId,
+          studentName: receiptStudentName,
+        );
+        await WidgetsBinding.instance.endOfFrame;
+        await Future<void>.delayed(const Duration(milliseconds: 16));
+        await downloadRegistrationReceipt(
+          registrationId: receiptRegistrationId,
+          registrationDate: receiptRegistrationDate,
+          studentName: receiptStudentName,
+          selectedFees: selectedFees,
+          totalFee: _totalFee,
+          discountAmount: _selectedDiscountAmount,
+          netFee: _netFee,
+          onStageChanged: (title, message) async {
+            _setReceiptDownloadOverlay(
+              isVisible: true,
+              title: title,
+              message: message,
+              registrationId: receiptRegistrationId,
+              studentName: receiptStudentName,
+            );
+            await WidgetsBinding.instance.endOfFrame;
+          },
+        );
+        _setReceiptDownloadOverlay(isVisible: false);
+        if (mounted) {
+          _showSnack(
+            'ລົງທະບຽນສຳເລັດ ✓ ແລະ ບັນທຶກໃບລົງທະບຽນແລ້ວ',
+            isError: false,
+          );
+        }
+      } catch (e) {
+        _setReceiptDownloadOverlay(isVisible: false);
+        if (mounted) {
+          _showSnack(
+            'ລົງທະບຽນສຳເລັດ ແຕ່ບັນທຶກໃບລົງທະບຽນບໍ່ສຳເລັດ: ${_errMsg(e)}',
+            isError: true,
+          );
+        }
+      }
+
+      if (!mounted) {
+        return;
+      }
+
       Navigator.of(context).pop({
         'registration_id': lastRegistration?.registrationId,
         'student_id': _savedStudentId,
@@ -408,6 +911,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
       if (!mounted) {
         return;
       }
+      _setReceiptDownloadOverlay(isVisible: false);
       setState(() => _isLoading = false);
       _showSnack(_errMsg(e), isError: true);
     }
@@ -471,21 +975,34 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
     final isProvinceLoading = provinceState.isLoading && provinces.isEmpty;
     final isDistrictLoading = districtState.isLoading;
     final isBusy =
-        _isLoading || studentState.isLoading || registrationState.isCreating;
+        !_isDownloadingReceipt &&
+        (_isLoading || studentState.isLoading || registrationState.isCreating);
+    final showServiceUnavailable = _hasCriticalServiceIssue(
+      provinceError: provinceState.error,
+      provinces: provinces,
+      feeError: feeState.error,
+      fees: fees,
+    );
 
-    if (provinceState.error != null && !isProvinceLoading) {
+    if (provinceState.error != null &&
+        !isProvinceLoading &&
+        !showServiceUnavailable) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _showErrorOnce(_errMsg(provinceState.error!));
       });
     }
 
-    if (feeState.error != null && !feeState.isLoading) {
+    if (feeState.error != null &&
+        !feeState.isLoading &&
+        !showServiceUnavailable) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _showErrorOnce(_errMsg(feeState.error!));
       });
     }
 
-    if (discountState.error != null && !discountState.isLoading) {
+    if (discountState.error != null &&
+        !discountState.isLoading &&
+        !showServiceUnavailable) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _showErrorOnce(_errMsg(discountState.error!));
       });
@@ -493,30 +1010,134 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
 
     return Scaffold(
       backgroundColor: _surface,
-      body: FadeTransition(
-        opacity: _pageFade,
-        child: SlideTransition(
-          position: _pageSlide,
-          child: isWide
-              ? _buildWideLayout(
-                  isBusy,
-                  provinces,
-                  districts,
-                  fees,
-                  isProvinceLoading,
-                  isDistrictLoading,
-                  feeState.isLoading,
-                )
-              : _buildNarrowLayout(
-                  isBusy,
-                  provinces,
-                  districts,
-                  fees,
-                  isProvinceLoading,
-                  isDistrictLoading,
-                  feeState.isLoading,
-                  isMedium,
+      body: Stack(
+        children: [
+          FadeTransition(
+            opacity: _pageFade,
+            child: SlideTransition(
+              position: _pageSlide,
+              child: isWide
+                  ? _buildWideLayout(
+                      isBusy,
+                      showServiceUnavailable,
+                      _serviceIssueMessage(
+                        provinceError: provinceState.error,
+                        feeError: feeState.error,
+                      ),
+                      provinces,
+                      districts,
+                      fees,
+                      isProvinceLoading,
+                      isDistrictLoading,
+                      feeState.isLoading,
+                    )
+                  : _buildNarrowLayout(
+                      isBusy,
+                      showServiceUnavailable,
+                      _serviceIssueMessage(
+                        provinceError: provinceState.error,
+                        feeError: feeState.error,
+                      ),
+                      provinces,
+                      districts,
+                      fees,
+                      isProvinceLoading,
+                      isDistrictLoading,
+                      feeState.isLoading,
+                      isMedium,
+                    ),
+            ),
+          ),
+          if (_isDownloadingReceipt) _buildReceiptDownloadOverlay(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReceiptDownloadOverlay() {
+    return Positioned.fill(
+      child: AbsorbPointer(
+        absorbing: true,
+        child: ColoredBox(
+          color: Colors.black.withValues(alpha: 0.28),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 400),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(color: _border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _navy.withValues(alpha: 0.16),
+                          blurRadius: 28,
+                          offset: const Offset(0, 18),
+                        ),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 26, 24, 24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 72,
+                            height: 72,
+                            decoration: BoxDecoration(
+                              color: _accentSoft,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: _accent.withValues(alpha: 0.18),
+                                width: 10,
+                              ),
+                            ),
+                            child: const Center(
+                              child: SizedBox(
+                                width: 32,
+                                height: 32,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 3,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    _accent,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          Text(
+                            _progressOverlayTitle,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 21,
+                              fontWeight: FontWeight.w800,
+                              color: _textPrimary,
+                              letterSpacing: -0.4,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _progressOverlayMessage,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              height: 1.6,
+                              color: _textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -525,6 +1146,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
   // ── Wide layout: left panel + right form ───────────────────────────────────
   Widget _buildWideLayout(
     bool isBusy,
+    bool showServiceUnavailable,
+    String serviceIssueMessage,
     List<ProvinceModel> provinces,
     List<DistrictModel> districts,
     List<FeeModel> fees,
@@ -540,12 +1163,15 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
         Expanded(
           child: _buildFormPanel(
             isBusy: isBusy,
+            showServiceUnavailable: showServiceUnavailable,
+            serviceIssueMessage: serviceIssueMessage,
             provinces: provinces,
             districts: districts,
             fees: fees,
             isProvinceLoading: isProvinceLoading,
             isDistrictLoading: isDistrictLoading,
             isFeeLoading: isFeeLoading,
+            useCardContainer: true,
             padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 40),
           ),
         ),
@@ -556,6 +1182,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
   // ── Narrow layout: stacked ─────────────────────────────────────────────────
   Widget _buildNarrowLayout(
     bool isBusy,
+    bool showServiceUnavailable,
+    String serviceIssueMessage,
     List<ProvinceModel> provinces,
     List<DistrictModel> districts,
     List<FeeModel> fees,
@@ -570,12 +1198,15 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
         Expanded(
           child: _buildFormPanel(
             isBusy: isBusy,
+            showServiceUnavailable: showServiceUnavailable,
+            serviceIssueMessage: serviceIssueMessage,
             provinces: provinces,
             districts: districts,
             fees: fees,
             isProvinceLoading: isProvinceLoading,
             isDistrictLoading: isDistrictLoading,
             isFeeLoading: isFeeLoading,
+            useCardContainer: isMedium,
             padding: EdgeInsets.symmetric(
               horizontal: isMedium ? 32 : 20,
               vertical: 24,
@@ -596,17 +1227,17 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
           Positioned(
             top: -60,
             left: -60,
-            child: _geoCircle(220, _navyLight.withOpacity(0.5)),
+            child: _geoCircle(220, _navyLight.withValues(alpha: 0.5)),
           ),
           Positioned(
             bottom: 80,
             right: -80,
-            child: _geoCircle(200, _navyLight.withOpacity(0.35)),
+            child: _geoCircle(200, _navyLight.withValues(alpha: 0.35)),
           ),
           Positioned(
             top: 200,
             left: -30,
-            child: _geoCircle(120, _accent.withOpacity(0.08)),
+            child: _geoCircle(120, _accent.withValues(alpha: 0.08)),
           ),
 
           // Content
@@ -625,7 +1256,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: _accent.withOpacity(0.4),
+                          color: _accent.withValues(alpha: 0.4),
                           blurRadius: 20,
                           offset: const Offset(0, 8),
                         ),
@@ -662,7 +1293,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                     'ລົງທະບຽນເພື່ອເຂົ້າຮຽນຫຼັກສູດໄລຍະສັ້ນຂອງພວກເຮົາ ສ້າງໂອກາດໃນການເກັ່ງ ແລະ ເຂົ້າຮຽນຢ່າງມີຄຸນນະພາບ',
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.white.withOpacity(0.6),
+                      color: Colors.white.withValues(alpha: 0.6),
                       height: 1.6,
                     ),
                   ),
@@ -757,9 +1388,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                 height: 40,
                 decoration: BoxDecoration(
                   color: isDone
-                      ? _successColor.withOpacity(0.15)
+                      ? _successColor.withValues(alpha: 0.15)
                       : isActive
-                      ? _accent.withOpacity(0.2)
+                      ? _accent.withValues(alpha: 0.2)
                       : _navyLight,
                   shape: BoxShape.circle,
                   border: Border.all(
@@ -777,7 +1408,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                       ? _successColor
                       : isActive
                       ? _accent
-                      : Colors.white.withOpacity(0.3),
+                      : Colors.white.withValues(alpha: 0.3),
                   size: 18,
                 ),
               ),
@@ -792,7 +1423,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                       fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
                       color: isActive
                           ? Colors.white
-                          : Colors.white.withOpacity(0.45),
+                          : Colors.white.withValues(alpha: 0.45),
                       letterSpacing: -0.2,
                     ),
                   ),
@@ -801,8 +1432,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                     style: TextStyle(
                       fontSize: 11,
                       color: isActive
-                          ? Colors.white.withOpacity(0.55)
-                          : Colors.white.withOpacity(0.25),
+                          ? Colors.white.withValues(alpha: 0.55)
+                          : Colors.white.withValues(alpha: 0.25),
                     ),
                   ),
                 ],
@@ -828,7 +1459,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
               decoration: BoxDecoration(
                 color: _currentStep > i ~/ 2
                     ? _accent
-                    : Colors.white.withOpacity(0.2),
+                    : Colors.white.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(1),
               ),
             ),
@@ -846,7 +1477,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                 ? _successColor
                 : isActive
                 ? _accent
-                : Colors.white.withOpacity(0.1),
+                : Colors.white.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(
@@ -862,14 +1493,76 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
   // ── Right / main form panel ────────────────────────────────────────────────
   Widget _buildFormPanel({
     required bool isBusy,
+    required bool showServiceUnavailable,
+    required String serviceIssueMessage,
     required List<ProvinceModel> provinces,
     required List<DistrictModel> districts,
     required List<FeeModel> fees,
     required bool isProvinceLoading,
     required bool isDistrictLoading,
     required bool isFeeLoading,
+    required bool useCardContainer,
     required EdgeInsets padding,
   }) {
+    if (showServiceUnavailable) {
+      return Container(
+        color: _surface,
+        child: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: padding,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 620),
+                child: _buildServiceUnavailableCard(serviceIssueMessage),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final formContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Page heading
+        _buildFormHeader(),
+        const SizedBox(height: 32),
+
+        // Form body
+        Skeletonizer(
+          enabled: isBusy,
+          child: AbsorbPointer(
+            absorbing: isBusy,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 320),
+              transitionBuilder: (child, anim) => FadeTransition(
+                opacity: anim,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0.04, 0),
+                    end: Offset.zero,
+                  ).animate(anim),
+                  child: child,
+                ),
+              ),
+              child: _currentStep == 0
+                  ? _buildPersonalStep(
+                      provinces,
+                      districts,
+                      isProvinceLoading,
+                      isDistrictLoading,
+                    )
+                  : _buildSubjectStep(fees, isFeeLoading),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 32),
+        _buildNavButtons(isBusy),
+        const SizedBox(height: 24),
+      ],
+    );
+
     return Container(
       color: _surface,
       child: SafeArea(
@@ -880,66 +1573,96 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
               constraints: const BoxConstraints(maxWidth: 560),
               child: Form(
                 key: _formKey,
-                child: Container(
-                  padding: EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                    border: Border.all(color: _border, width: 1.5),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Page heading
-                      _buildFormHeader(),
-                      const SizedBox(height: 32),
-
-                      // Form body
-                      Skeletonizer(
-                        enabled: isBusy,
-                        child: AbsorbPointer(
-                          absorbing: isBusy,
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 320),
-                            transitionBuilder: (child, anim) => FadeTransition(
-                              opacity: anim,
-                              child: SlideTransition(
-                                position: Tween<Offset>(
-                                  begin: const Offset(0.04, 0),
-                                  end: Offset.zero,
-                                ).animate(anim),
-                                child: child,
-                              ),
+                child: useCardContainer
+                    ? Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
                             ),
-                            child: _currentStep == 0
-                                ? _buildPersonalStep(
-                                    provinces,
-                                    districts,
-                                    isProvinceLoading,
-                                    isDistrictLoading,
-                                  )
-                                : _buildSubjectStep(fees, isFeeLoading),
-                          ),
+                          ],
+                          border: Border.all(color: _border, width: 1.5),
                         ),
-                      ),
-
-                      const SizedBox(height: 32),
-                      _buildNavButtons(isBusy),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
-                ),
+                        child: formContent,
+                      )
+                    : formContent,
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildServiceUnavailableCard(String message) {
+    return Container(
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: _border, width: 1.4),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF1F2),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Icon(
+              Icons.wifi_off_rounded,
+              color: _errorColor,
+              size: 32,
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'ລະບົບລົງທະບຽນບໍ່ພ້ອມໃຊ້ງານຊົ່ວຄາວ',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: _textPrimary,
+              height: 1.2,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            style: const TextStyle(
+              fontSize: 15,
+              color: _textSecondary,
+              height: 1.7,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: _NavButton.filled(
+                  label: 'ລອງໃໝ່',
+                  icon: Icons.refresh_rounded,
+                  onPressed: _retryInitialDependencies,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -951,7 +1674,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
         Text(
           'ຟອມລົງທະບຽນນັກຮຽນ',
           style: const TextStyle(
-            fontSize: 28,
+            fontSize: 22,
             fontWeight: FontWeight.w800,
             color: _textPrimary,
             letterSpacing: -0.8,
@@ -1028,16 +1751,20 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
           controller: _studentContactController,
           keyboardType: TextInputType.phone,
           labelText: 'ເບີໂທນັກຮຽນ',
-          hintText: 'ກະລຸນາປ້ອນເບີໂທນັກຮຽນ',
+          hintText: 'ກະລຸນາປ້ອນເບີໂທນັກຮຽນ(020XXXXXXXX)',
           validator: (v) => _validatePhone(v, 'ກະລຸນາປ້ອນເບີໂທນັກຮຽນ'),
+          digitOnly: DigitOnly.integer,
+          inputFormatters: const [_phoneNumberFormatter],
         ),
         const SizedBox(height: 14),
         AppTextField(
           controller: _parentsContactController,
           keyboardType: TextInputType.phone,
           labelText: 'ເບີໂທພໍ່ແມ່',
-          hintText: 'ກະລຸນາປ້ອນເບີໂທພໍ່ແມ່',
+          hintText: 'ກະລຸນາປ້ອນເບີໂທພໍ່ແມ່(020XXXXXXXX ຫຼື 030XXXXXXX)',
           validator: (v) => _validatePhone(v, 'ກະລຸນາປ້ອນເບີໂທພໍ່ແມ່'),
+          digitOnly: DigitOnly.integer,
+          inputFormatters: const [_phoneNumberFormatter],
         ),
         const SizedBox(height: 14),
         AppTextField(
@@ -1084,11 +1811,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
         ),
         const SizedBox(height: 28),
 
-        _sectionLabel('ຂໍ້ມູນເພີ່ມເຕີມ', Icons.tune_rounded),
+        _sectionLabel('ການພັກເຊົ່າ', Icons.home_filled),
         const SizedBox(height: 14),
         AppDropdownField<String>(
           labelText: 'ຫໍພັກ',
-          hintText: 'ກະລຸນາເລືອກປະເພດຫໍພັກ',
+          hintText: 'ກະລຸນາເລືອກຫໍພັກ',
           value: _selectedDormitory,
           items: _dormitories
               .map((d) => DropdownMenuItem(value: d, child: Text(d)))
@@ -1198,7 +1925,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                 ),
                 const Divider(height: 24),
                 _SummaryRow(
-                  label: 'ຍອດສຸດທ້າຍ',
+                  label: 'ຕ້ອງຈ່າຍ',
                   value: '${_formatCurrency(_netFee)} ກີບ',
                   isEmphasis: true,
                 ),
@@ -1250,7 +1977,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                   label: 'ລົງທະບຽນ',
                   icon: Icons.check_circle_outline_rounded,
                   isLoading: isBusy,
-                  onPressed: isBusy ? null : _handleRegister,
+                  onPressed: isBusy ? null : _confirmAndHandleRegister,
                 ),
         ),
       ],
@@ -1317,7 +2044,7 @@ class _GenderSelector extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         height: 56,
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.08) : _surface,
+          color: isSelected ? color.withValues(alpha: 0.08) : _surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: isSelected ? color : _border,
@@ -1362,8 +2089,8 @@ class _NavButton extends StatelessWidget {
   final String label;
   final IconData icon;
   final VoidCallback? onPressed;
-  final bool isLoading;
   final bool _outlined;
+  final bool isLoading;
 
   const _NavButton.filled({
     required this.label,
@@ -1376,8 +2103,8 @@ class _NavButton extends StatelessWidget {
     required this.label,
     required this.icon,
     this.onPressed,
-    this.isLoading = false,
-  }) : _outlined = true;
+  }) : _outlined = true,
+       isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -1417,7 +2144,7 @@ class _NavButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: _accent,
           foregroundColor: Colors.white,
-          disabledBackgroundColor: _accent.withOpacity(0.5),
+          disabledBackgroundColor: _accent.withValues(alpha: 0.5),
           elevation: 0,
           shadowColor: Colors.transparent,
           shape: RoundedRectangleBorder(

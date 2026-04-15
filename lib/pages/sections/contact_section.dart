@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map_cancellable_tile_provider/flutter_map_cancellable_tile_provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -11,6 +13,14 @@ import 'package:palee_web_portfolio/widgets/modern_contact_card.dart';
 /// Contact section widget with contact cards and map
 class ContactSection extends StatelessWidget {
   const ContactSection({super.key});
+
+  TileProvider? _buildTileProvider() {
+    if (!kIsWeb) {
+      return null;
+    }
+
+    return CancellableNetworkTileProvider();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -271,12 +281,14 @@ class ContactSection extends StatelessWidget {
                           urlTemplate:
                               'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
                           userAgentPackageName: 'com.example.app',
+                          tileProvider: _buildTileProvider(),
                           maxZoom: 19,
                         ),
                         TileLayer(
                           urlTemplate:
                               'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
                           userAgentPackageName: 'com.example.app',
+                          tileProvider: _buildTileProvider(),
                           maxZoom: 19,
                         ),
                         MarkerLayer(

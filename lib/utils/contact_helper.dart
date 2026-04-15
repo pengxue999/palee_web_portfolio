@@ -12,7 +12,7 @@ class ContactHelper {
 
   static Future<void> openFacebook() async {
     final Uri url = Uri.parse(
-      'https://www.facebook.com/profile.php?id=100063468703990', // change to your real page URL
+      'https://www.facebook.com/profile.php?id=100063468703990',
     );
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);

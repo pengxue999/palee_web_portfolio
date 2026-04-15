@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:palee_web_portfolio/utils/responsive_helper.dart';
+
+enum DigitOnly { integer, decimal }
 
 /// Reusable text field used across auth and contact forms
 class AppTextField extends StatefulWidget {
@@ -12,6 +15,8 @@ class AppTextField extends StatefulWidget {
   final String? Function(String?)? validator;
   final bool obscureText;
   final VoidCallback? onToggleObscure;
+  final DigitOnly? digitOnly;
+  final List<TextInputFormatter>? inputFormatters;
 
   const AppTextField({
     super.key,
@@ -24,6 +29,8 @@ class AppTextField extends StatefulWidget {
     this.validator,
     this.obscureText = false,
     this.onToggleObscure,
+    this.digitOnly,
+    this.inputFormatters,
   });
 
   @override
@@ -73,6 +80,19 @@ class _AppTextFieldState extends State<AppTextField>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final digitOnlyFormatters = switch (widget.digitOnly) {
+      DigitOnly.integer => <TextInputFormatter>[
+        FilteringTextInputFormatter.digitsOnly,
+      ],
+      DigitOnly.decimal => <TextInputFormatter>[
+        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+      ],
+      null => null,
+    };
+    final inputFormatters = [
+      ...?digitOnlyFormatters,
+      ...?widget.inputFormatters,
+    ];
 
     final labelFontSize = ResponsiveHelper.getResponsiveFontSize(
       context,
@@ -120,6 +140,7 @@ class _AppTextFieldState extends State<AppTextField>
         controller: widget.controller,
         focusNode: _focusNode,
         keyboardType: widget.keyboardType,
+        inputFormatters: inputFormatters.isEmpty ? null : inputFormatters,
         obscureText: widget.obscureText,
         validator: (value) {
           final result = widget.validator?.call(value);
@@ -141,30 +162,28 @@ class _AppTextFieldState extends State<AppTextField>
             color: _isFocused
                 ? accentColor
                 : isDark
-                    ? const Color(0xFF8890B0)
-                    : const Color(0xFF8891AA),
+                ? const Color(0xFF8890B0)
+                : const Color(0xFF8891AA),
             fontWeight: _isFocused ? FontWeight.w500 : FontWeight.w400,
           ),
           floatingLabelStyle: TextStyle(
             fontSize: labelFontSize - 2,
-            color: _hasError
-                ? const Color(0xFFFF5C5C)
-                : accentColor,
+            color: _hasError ? const Color(0xFFFF5C5C) : accentColor,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.3,
           ),
           hintText: widget.hintText,
           hintStyle: TextStyle(
-            color: isDark
-                ? const Color(0xFF4A4F6A)
-                : const Color(0xFFB8BCCC),
+            color: isDark ? const Color(0xFF4A4F6A) : const Color(0xFFB8BCCC),
             fontSize: labelFontSize - 1,
           ),
           // Prefix icon with animated scale + colored background pill
           prefixIcon: widget.prefixIcon != null
               ? Padding(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 10),
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   child: AnimatedBuilder(
                     animation: _iconScaleAnimation,
                     builder: (context, child) => Transform.scale(
@@ -187,8 +206,8 @@ class _AppTextFieldState extends State<AppTextField>
                         color: _isFocused
                             ? accentColor
                             : isDark
-                                ? const Color(0xFF6B72A0)
-                                : const Color(0xFF9099C0),
+                            ? const Color(0xFF6B72A0)
+                            : const Color(0xFF9099C0),
                       ),
                     ),
                   ),
@@ -219,8 +238,8 @@ class _AppTextFieldState extends State<AppTextField>
                       color: _isFocused
                           ? accentColor
                           : isDark
-                              ? const Color(0xFF6B72A0)
-                              : const Color(0xFF9099C0),
+                          ? const Color(0xFF6B72A0)
+                          : const Color(0xFF9099C0),
                     ),
                   ),
                   splashRadius: 20,
@@ -247,13 +266,11 @@ class _AppTextFieldState extends State<AppTextField>
           ),
           errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(
-                color: Color(0xFFFF5C5C), width: 1.5),
+            borderSide: const BorderSide(color: Color(0xFFFF5C5C), width: 1.5),
           ),
           focusedErrorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(
-                color: Color(0xFFFF5C5C), width: 2),
+            borderSide: const BorderSide(color: Color(0xFFFF5C5C), width: 2),
           ),
           errorStyle: const TextStyle(
             color: Color(0xFFFF5C5C),

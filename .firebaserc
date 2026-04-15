@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "palee-d52cb"
-  }
+    "default": "palee-d52cb",
+    "firebase use palee-elite-training-center": "palee-elite-training-center"
+  },
+  "targets": {},
+  "etags": {}
 }

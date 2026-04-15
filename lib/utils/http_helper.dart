@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -55,6 +56,9 @@ class HttpHelper {
         throw ValidationException(message, errors: json['data']);
 
       case 500:
+      case 502:
+      case 503:
+      case 504:
         throw ServerException(message);
 
       default:
@@ -210,8 +214,16 @@ class HttpHelper {
 
     if (error is SocketException) {
       return Exception('ບໍ່ສາມາດເຊື່ອມຕໍ່ກັບເຊີບເວີໄດ້: ${error.message}');
+    } else if (error is TimeoutException) {
+      return Exception(
+        'ການເຊື່ອມຕໍ່ຫາເຊີບເວີໃຊ້ເວລາດົນເກີນໄປ. ກະລຸນາລອງໃໝ່ອີກຄັ້ງ',
+      );
     } else if (error is HttpException) {
       return Exception('HTTP Error: ${error.message}');
+    } else if (error is http.ClientException) {
+      return Exception(
+        'ບໍ່ສາມາດຕິດຕໍ່ API service ໄດ້. ກະລຸນາກວດສອບ server ແລະລອງໃໝ່',
+      );
     } else if (error is FormatException) {
       return Exception('ຮູບແບບຂໍ້ມູນບໍ່ຖືກຕ້ອງ: ${error.message}');
     } else {

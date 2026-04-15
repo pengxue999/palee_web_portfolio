@@ -105,10 +105,12 @@ class AchievementsSection extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 for (int i = 0; i < stats.length; i++) ...[
-                  StatItem(
-                    number: stats[i]['number']!,
-                    label: stats[i]['label']!,
-                    textColor: Colors.white,
+                  Expanded(
+                    child: StatItem(
+                      number: stats[i]['number']!,
+                      label: stats[i]['label']!,
+                      textColor: Colors.white,
+                    ),
                   ),
                   if (i < stats.length - 1)
                     Container(height: 80, width: 1, color: Colors.white24),
