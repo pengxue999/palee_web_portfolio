@@ -40,6 +40,10 @@ class FeeNotifier extends StateNotifier<FeeState> {
   void clearError() {
     state = state.copyWith(error: null);
   }
+
+  void resetState() {
+    state = const FeeState();
+  }
 }
 
 final feeProvider = StateNotifierProvider<FeeNotifier, FeeState>(

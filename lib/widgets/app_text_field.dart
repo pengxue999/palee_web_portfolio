@@ -158,7 +158,7 @@ class _AppTextFieldState extends State<AppTextField>
         decoration: InputDecoration(
           labelText: widget.labelText,
           labelStyle: TextStyle(
-            fontSize: labelFontSize - 1,
+            fontSize: labelFontSize,
             color: _isFocused
                 ? accentColor
                 : isDark
@@ -167,7 +167,7 @@ class _AppTextFieldState extends State<AppTextField>
             fontWeight: _isFocused ? FontWeight.w500 : FontWeight.w400,
           ),
           floatingLabelStyle: TextStyle(
-            fontSize: labelFontSize - 2,
+            fontSize: labelFontSize,
             color: _hasError ? const Color(0xFFFF5C5C) : accentColor,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.3,
@@ -175,7 +175,7 @@ class _AppTextFieldState extends State<AppTextField>
           hintText: widget.hintText,
           hintStyle: TextStyle(
             color: isDark ? const Color(0xFF4A4F6A) : const Color(0xFFB8BCCC),
-            fontSize: labelFontSize - 1,
+            fontSize: labelFontSize,
           ),
           // Prefix icon with animated scale + colored background pill
           prefixIcon: widget.prefixIcon != null

@@ -1,5 +1,4 @@
 import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,9 +25,9 @@ const _navy = Color(0xFF0F1629);
 const _navyLight = Color(0xFF243052);
 const _accent = Color(0xFF4F7EFF);
 const _accentSoft = Color(0xFFEEF3FF);
-const _gold = Color(0xFFF5C842);
 const _surface = Color(0xFFFAFBFF);
 const _border = Color(0xFFE8ECFA);
+const _noteAccent = Color(0xFFF59E0B);
 const _textPrimary = Color(0xFF111827);
 const _textSecondary = Color(0xFF6B7497);
 const _errorColor = Color(0xFFEF4444);
@@ -107,6 +106,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
 
   final List<String> _dormitories = ['ຫໍພັກໃນ', 'ຫໍພັກນອກ'];
 
+  static const Map<String, int> _dormitoryFees = <String, int>{
+    'ຫໍພັກໃນ': 200000,
+    'ຫໍພັກນອກ': 100000,
+  };
+
   // ── Steps metadata ─────────────────────────────────────────────────────────
   final List<_StepMeta> _steps = const [
     _StepMeta(
@@ -141,9 +145,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(provinceProvider.notifier).getProvinces();
-      ref.read(districtProvider.notifier).clearDistricts();
       ref.read(feeProvider.notifier).getFees();
       ref.read(discountProvider.notifier).getDiscounts();
+      ref.read(districtProvider.notifier).clearDistricts();
     });
   }
 
@@ -245,17 +249,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
     ]);
   }
 
-  Map<String, String> _selectedSubjectSummary(List<FeeModel> fees) {
-    final summary = <String, String>{};
-    for (final fee in fees) {
-      if (_selectedFeeIds.contains(fee.feeId)) {
-        summary[fee.subjectName] = fee.levelName;
-      }
-    }
-    return summary;
-  }
-
-  int get _totalFee {
+  int get _tuitionFee {
     final fees = ref.read(feeProvider).fees;
     return _selectedFeeIds.fold<int>(0, (sum, feeId) {
       final matched = fees.where((fee) => fee.feeId == feeId);
@@ -266,13 +260,45 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
     });
   }
 
+  bool get _shouldChargeDormitoryFee =>
+      !ref.read(studentProvider).reusedExistingStudent;
+
+  int get _dormitoryFee {
+    if (!_shouldChargeDormitoryFee) {
+      return 0;
+    }
+    return _dormitoryFees[_selectedDormitory] ?? 0;
+  }
+
+  String get _dormitoryFeeLabel {
+    if (!_shouldChargeDormitoryFee) {
+      return 'ຄ່າອື່ນໆ';
+    }
+
+    if (_selectedDormitory == null || _selectedDormitory!.isEmpty) {
+      return 'ຄ່າອື່ນໆ';
+    }
+
+    if (_selectedDormitory == 'ຫໍພັກໃນ') {
+      return 'ຄ່າອື່ນໆ(ຄ່ານ້ຳ,ໄຟ,ຂີ້ເຫຍື້ອ)';
+    }
+
+    if (_selectedDormitory == 'ຫໍພັກນອກ') {
+      return 'ຄ່າອື່ນໆ(ຄ່າໄຟ)';
+    }
+
+    return 'ຄ່າອື່ນໆ';
+  }
+
+  int get _totalFee => _tuitionFee + _dormitoryFee;
+
   int get _selectedDiscountAmount {
     final discount = _autoAppliedDiscount;
     if (discount == null) {
       return 0;
     }
     final percentage = discount.discountAmount.toInt();
-    return ((_totalFee * percentage) / 100).round();
+    return ((_tuitionFee * percentage) / 100).round();
   }
 
   int get _netFee => _totalFee - _selectedDiscountAmount;
@@ -342,6 +368,47 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
     });
   }
 
+  void _removeSelectedFee(String feeId) {
+    final nextSelected = Set<String>.from(_selectedFeeIds)..remove(feeId);
+    _syncSelectionState(nextSelected);
+  }
+
+  void _resetRegistrationFlow() {
+    _formKey.currentState?.reset();
+    _firstNameController.clear();
+    _lastNameController.clear();
+    _studentContactController.clear();
+    _parentsContactController.clear();
+    _schoolController.clear();
+    _stepController.reset();
+
+    ref.read(studentProvider.notifier).resetState();
+    ref.read(registrationProvider.notifier).resetState();
+    ref.read(feeProvider.notifier).resetState();
+    ref.read(discountProvider.notifier).resetState();
+    ref.read(provinceProvider.notifier).resetState();
+    ref.read(districtProvider.notifier).resetState();
+
+    setState(() {
+      _selectedGender = null;
+      _selectedProvince = null;
+      _selectedDistrict = null;
+      _selectedDormitory = null;
+      _isLoading = false;
+      _isDownloadingReceipt = false;
+      _currentStep = 0;
+      _savedStudentId = null;
+      _lastShownError = null;
+      _downloadReceiptRegistrationId = null;
+      _downloadReceiptStudentName = null;
+      _progressOverlayTitle = 'ກຳລັງດາວໂຫຼດໃບລົງທະບຽນ';
+      _progressOverlayMessage =
+          'ກະລຸນາລໍຖ້າຊົ່ວຄາວ. ລະບົບກຳລັງສ້າງ ແລະ ບັນທຶກ PDF ເຂົ້າເຄື່ອງຂອງທ່ານ.';
+      _scholarshipStatusByFee = <String, String>{};
+      _selectedFeeIds = <String>{};
+    });
+  }
+
   // ── Province / District ────────────────────────────────────────────────────
   Future<void> _handleProvinceChanged(String? value) async {
     setState(() {
@@ -368,7 +435,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
     parentsContact: _normalizePhone(_parentsContactController.text),
     school: _schoolController.text.trim(),
     districtId: int.parse(_selectedDistrict!),
-    dormitoryType: _selectedDormitory ?? 'ຫໍພັກນອກ',
+    dormitoryType: _selectedDormitory!,
   );
 
   Future<void> _handleNext() async {
@@ -385,16 +452,24 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
       _showSnack('ກະລຸນາເລືອກເມືອງ', isError: true);
       return;
     }
+    if (_selectedDormitory == null || _selectedDormitory!.isEmpty) {
+      _showSnack('ກະລຸນາເລືອກຫໍພັກ', isError: true);
+      return;
+    }
 
     setState(() => _isLoading = true);
     try {
       final isUpdate = _savedStudentId != null;
       final req = _buildRequest();
       final ok = !isUpdate
-          ? await ref.read(studentProvider.notifier).createStudent(req)
+          ? await ref
+                .read(studentProvider.notifier)
+                .createStudentForRegistration(req)
           : await ref
                 .read(studentProvider.notifier)
                 .updateStudent(_savedStudentId!, req);
+      ref.read(feeProvider.notifier).getFees();
+      ref.read(discountProvider.notifier).getDiscounts();
 
       if (!mounted) return;
       if (!ok) {
@@ -407,7 +482,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
         );
         return;
       }
-      final student = ref.read(studentProvider).selectedStudent;
+      final studentState = ref.read(studentProvider);
+      final student = studentState.selectedStudent;
+      final reusedExistingStudent = studentState.reusedExistingStudent;
       setState(() {
         _savedStudentId = student?.studentId ?? _savedStudentId;
         _isLoading = false;
@@ -415,7 +492,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
       });
       _stepController.forward(from: 0);
       _showSnack(
-        !isUpdate ? 'ບັນທຶກສຳເລັດ ✓' : 'ອັບເດດສຳເລັດ ✓',
+        !isUpdate
+            ? reusedExistingStudent
+                  ? 'ພົບຂໍ້ມູນນັກຮຽນເກົ່າ ແລະ ນຳໄປລົງທະບຽນຕໍ່ໄດ້ເລີຍ ✓'
+                  : 'ບັນທຶກສຳເລັດ ✓'
+            : 'ອັບເດດສຳເລັດ ✓',
         isError: false,
       );
     } catch (e) {
@@ -571,7 +652,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                                           'ຈຳນວນວິຊາ',
                                           '${selectedFees.length} ວິຊາ',
                                         ),
-
                                         const SizedBox(height: 12),
                                         _buildDialogInfoRow(
                                           'ຍອດຊຳລະສຸດທ້າຍ',
@@ -835,9 +915,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
           .fees
           .where((fee) => _selectedFeeIds.contains(fee.feeId))
           .toList();
-      final selectedSummary = _selectedSubjectSummary(
-        ref.read(feeProvider).fees,
-      );
       final receiptRegistrationId =
           (lastRegistration?.registrationId.isNotEmpty ?? false)
           ? lastRegistration!.registrationId
@@ -866,6 +943,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
           registrationDate: receiptRegistrationDate,
           studentName: receiptStudentName,
           selectedFees: selectedFees,
+          tuitionFee: _tuitionFee,
+          dormitoryLabel: _dormitoryFeeLabel,
+          dormitoryFee: _dormitoryFee,
           totalFee: _totalFee,
           discountAmount: _selectedDiscountAmount,
           netFee: _netFee,
@@ -901,12 +981,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
         return;
       }
 
-      Navigator.of(context).pop({
-        'registration_id': lastRegistration?.registrationId,
-        'student_id': _savedStudentId,
-        'selected_fee_ids': _selectedFeeIds.toList(),
-        'selected_subjects': selectedSummary,
-      });
+      _resetRegistrationFlow();
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
     } catch (e) {
       if (!mounted) {
         return;
@@ -1284,7 +1362,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                     width: 60,
                     height: 3,
                     decoration: BoxDecoration(
-                      color: _gold,
+                      color: const Color.fromARGB(255, 241, 203, 89),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -1635,7 +1713,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
           const Text(
             'ລະບົບລົງທະບຽນບໍ່ພ້ອມໃຊ້ງານຊົ່ວຄາວ',
             style: TextStyle(
-              fontSize: 24,
+              fontSize: 20,
               fontWeight: FontWeight.w800,
               color: _textPrimary,
               height: 1.2,
@@ -1727,7 +1805,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                 controller: _firstNameController,
                 labelText: 'ຊື່',
                 hintText: 'ກະລຸນາປ້ອນຊື່',
-                validator: (v) => _validateRequired(v, 'ກະລຸນາປ້ອນຊື່'),
+                validator: (v) => _validateRequired(v, 'ຊື່'),
               ),
             ),
             const SizedBox(width: 12),
@@ -1736,7 +1814,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                 controller: _lastNameController,
                 labelText: 'ນາມສະກຸນ',
                 hintText: 'ກະລຸນາປ້ອນນາມສະກຸນ',
-                validator: (v) => _validateRequired(v, 'ກະລຸນາປ້ອນນາມສະກຸນ'),
+                validator: (v) => _validateRequired(v, 'ນາມສະກຸນ'),
               ),
             ),
           ],
@@ -1752,7 +1830,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
           keyboardType: TextInputType.phone,
           labelText: 'ເບີໂທນັກຮຽນ',
           hintText: 'ກະລຸນາປ້ອນເບີໂທນັກຮຽນ(020XXXXXXXX)',
-          validator: (v) => _validatePhone(v, 'ກະລຸນາປ້ອນເບີໂທນັກຮຽນ'),
+          validator: (v) => _validatePhone(v, 'ເບີໂທນັກຮຽນ'),
           digitOnly: DigitOnly.integer,
           inputFormatters: const [_phoneNumberFormatter],
         ),
@@ -1762,7 +1840,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
           keyboardType: TextInputType.phone,
           labelText: 'ເບີໂທພໍ່ແມ່',
           hintText: 'ກະລຸນາປ້ອນເບີໂທພໍ່ແມ່(020XXXXXXXX ຫຼື 030XXXXXXX)',
-          validator: (v) => _validatePhone(v, 'ກະລຸນາປ້ອນເບີໂທພໍ່ແມ່'),
+          validator: (v) => _validatePhone(v, 'ເບີໂທພໍ່ແມ່'),
           digitOnly: DigitOnly.integer,
           inputFormatters: const [_phoneNumberFormatter],
         ),
@@ -1771,7 +1849,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
           controller: _schoolController,
           labelText: 'ໂຮງຮຽນ',
           hintText: 'ກະລຸນາປ້ອນຊື່ໂຮງຮຽນ',
-          validator: (v) => _validateRequired(v, 'ກະລຸນາປ້ອນຊື່ໂຮງຮຽນ'),
+          validator: (v) => _validateRequired(v, 'ຊື່ໂຮງຮຽນ'),
         ),
         const SizedBox(height: 28),
 
@@ -1779,7 +1857,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
         const SizedBox(height: 14),
         AppDropdownField<String>(
           labelText: 'ແຂວງ',
-          hintText: 'ກະລຸນາເລືອກແຂວງ',
+          hintText: 'ເລືອກແຂວງ',
           value: _selectedProvince,
           isLoading: isProvinceLoading,
           items: provinces
@@ -1811,16 +1889,67 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
         ),
         const SizedBox(height: 28),
 
-        _sectionLabel('ການພັກເຊົ່າ', Icons.home_filled),
+        _sectionLabel('ການພັກເຊົາ', Icons.home_filled),
+
         const SizedBox(height: 14),
         AppDropdownField<String>(
           labelText: 'ຫໍພັກ',
-          hintText: 'ກະລຸນາເລືອກຫໍພັກ',
+          hintText: 'ເລືອກຫໍພັກ',
           value: _selectedDormitory,
           items: _dormitories
               .map((d) => DropdownMenuItem(value: d, child: Text(d)))
               .toList(),
           onChanged: (v) => setState(() => _selectedDormitory = v),
+        ),
+        const SizedBox(height: 12),
+        CustomPaint(
+          foregroundPainter: const _DottedRoundedBorderPainter(
+            color: _noteAccent,
+            radius: 14,
+            strokeWidth: 1.2,
+            dashWidth: 4,
+            dashGap: 6,
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      size: 20,
+                      color: _noteAccent,
+                    ),
+                    const SizedBox(width: 5),
+                    const Text(
+                      'ໝາຍເຫດ',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: _textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '- ນັກຮຽນທີ່ມາພັກຫໍພັກໃນ ຈະໄດ້ຊ່ວຍຈ່າຍນ້ຳ, ໄຟ ແລະ ຂີ້ເຫຍື້ອ 200,000 ກີບ.\n- ນັກຮຽນທີ່ພັກຫໍພັກນອກ ຈະໄດ້ຊ່ວຍຈ່າຍຄ່າໄຟ 100,000 ກີບ(ຫ້ອງຮຽນມີແອ).',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _navyLight,
+                    height: 1.6,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ],
     );
@@ -1859,12 +1988,28 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '${fee.subjectName} ${fee.levelName}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: _textPrimary,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${fee.subjectName} ${fee.levelName}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: _textPrimary,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => _removeSelectedFee(fee.feeId),
+                        tooltip: 'ລຶບວິຊານີ້',
+                        visualDensity: VisualDensity.compact,
+                        splashRadius: 20,
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          color: _errorColor,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 10),
                   Wrap(
@@ -1917,13 +2062,20 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                 ),
                 _SummaryRow(
                   label: 'ຄ່າຮຽນລວມ',
-                  value: '${_formatCurrency(_totalFee)} ກີບ',
+                  value: '${_formatCurrency(_tuitionFee)} ກີບ',
                 ),
                 _SummaryRow(
                   label: 'ສ່ວນຫຼຸດ($_autoDiscountDescription)',
                   value: '${_formatCurrency(_selectedDiscountAmount)} ກີບ',
                 ),
+                if (_dormitoryFee > 0)
+                  _SummaryRow(
+                    label: _dormitoryFeeLabel,
+                    value: '${_formatCurrency(_dormitoryFee)} ກີບ',
+                  ),
+
                 const Divider(height: 24),
+
                 _SummaryRow(
                   label: 'ຕ້ອງຈ່າຍ',
                   value: '${_formatCurrency(_netFee)} ກີບ',
@@ -2011,6 +2163,57 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
         Expanded(child: Container(height: 1, color: _border)),
       ],
     );
+  }
+}
+
+class _DottedRoundedBorderPainter extends CustomPainter {
+  final Color color;
+  final double radius;
+  final double strokeWidth;
+  final double dashWidth;
+  final double dashGap;
+
+  const _DottedRoundedBorderPainter({
+    required this.color,
+    required this.radius,
+    required this.strokeWidth,
+    required this.dashWidth,
+    required this.dashGap,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+
+    final rect = Offset.zero & size;
+    final rrect = RRect.fromRectAndRadius(
+      rect.deflate(strokeWidth / 2),
+      Radius.circular(radius),
+    );
+    final path = Path()..addRRect(rrect);
+
+    for (final metric in path.computeMetrics()) {
+      double distance = 0;
+      while (distance < metric.length) {
+        final nextDistance = (distance + dashWidth)
+            .clamp(0, metric.length)
+            .toDouble();
+        canvas.drawPath(metric.extractPath(distance, nextDistance), paint);
+        distance += dashWidth + dashGap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DottedRoundedBorderPainter oldDelegate) {
+    return oldDelegate.color != color ||
+        oldDelegate.radius != radius ||
+        oldDelegate.strokeWidth != strokeWidth ||
+        oldDelegate.dashWidth != dashWidth ||
+        oldDelegate.dashGap != dashGap;
   }
 }
 

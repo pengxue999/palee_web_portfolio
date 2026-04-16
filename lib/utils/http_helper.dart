@@ -50,7 +50,7 @@ class HttpHelper {
         throw NotFoundException(message);
 
       case 409:
-        throw ConflictException(message);
+        throw ConflictException(message, data: json['data']);
 
       case 422:
         throw ValidationException(message, errors: json['data']);
@@ -199,7 +199,14 @@ class HttpHelper {
 
   http.Response _handleResponse(http.Response response) {
     if (kDebugMode) {
-      print('HTTP Response [${response.statusCode}]: ${response.body}');
+      final contentType = response.headers['content-type'] ?? '';
+      if (contentType.contains('application/pdf')) {
+        print(
+          'HTTP Response [${response.statusCode}]: <binary pdf ${response.bodyBytes.length} bytes>',
+        );
+      } else {
+        print('HTTP Response [${response.statusCode}]: ${response.body}');
+      }
     }
     return response;
   }
@@ -241,7 +248,8 @@ class NotFoundException implements Exception {
 
 class ConflictException implements Exception {
   final String message;
-  ConflictException(this.message);
+  final dynamic data;
+  ConflictException(this.message, {this.data});
   @override
   String toString() => message;
 }

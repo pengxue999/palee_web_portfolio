@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:palee_web_portfolio/services/district_service.dart';
 import '../models/district_model.dart';
 
-final districtServiceProvider =
-    Provider<DistrictService>((_) => DistrictService());
+final districtServiceProvider = Provider<DistrictService>(
+  (_) => DistrictService(),
+);
 
 class DistrictState {
   final List<DistrictModel> districts;
@@ -53,7 +54,10 @@ class DistrictNotifier extends StateNotifier<DistrictState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final response = await _service.getDistrictsByProvince(provinceId);
-      state = state.copyWith(filteredDistricts: response.data, isLoading: false);
+      state = state.copyWith(
+        filteredDistricts: response.data,
+        isLoading: false,
+      );
     } catch (e) {
       state = state.copyWith(error: e.toString(), isLoading: false);
     }
@@ -62,9 +66,12 @@ class DistrictNotifier extends StateNotifier<DistrictState> {
   void clearDistricts() {
     state = state.copyWith(filteredDistricts: []);
   }
+
+  void resetState() {
+    state = const DistrictState();
+  }
 }
 
-final districtProvider =
-    StateNotifierProvider<DistrictNotifier, DistrictState>(
+final districtProvider = StateNotifierProvider<DistrictNotifier, DistrictState>(
   (ref) => DistrictNotifier(ref.read(districtServiceProvider)),
 );

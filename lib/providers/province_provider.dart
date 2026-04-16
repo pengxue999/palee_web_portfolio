@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/legacy.dart';
 import '../models/province_model.dart';
 import '../services/province_service.dart';
 
-final provinceServiceProvider = Provider<ProvinceService>((_) => ProvinceService());
+final provinceServiceProvider = Provider<ProvinceService>(
+  (_) => ProvinceService(),
+);
 
 class ProvinceState {
   final List<ProvinceModel> provinces;
@@ -42,6 +44,10 @@ class ProvinceNotifier extends StateNotifier<ProvinceState> {
     } catch (e) {
       state = state.copyWith(error: e.toString(), isLoading: false);
     }
+  }
+
+  void resetState() {
+    state = const ProvinceState();
   }
 }
 

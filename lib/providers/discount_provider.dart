@@ -50,6 +50,10 @@ class DiscountNotifier extends StateNotifier<DiscountState> {
   void clearError() {
     state = state.copyWith(error: null);
   }
+
+  void resetState() {
+    state = const DiscountState();
+  }
 }
 
 final discountProvider = StateNotifierProvider<DiscountNotifier, DiscountState>(

@@ -10,6 +10,13 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:palee_web_portfolio/models/fee_model.dart';
+import 'package:palee_web_portfolio/services/registration_service.dart';
+
+final RegistrationService _registrationService = RegistrationService();
+
+bool _shouldUseServerReceiptRenderer() {
+  return true;
+}
 
 class RegistrationReceiptDownloadException implements Exception {
   const RegistrationReceiptDownloadException(this.message);
@@ -25,6 +32,9 @@ Future<void> downloadRegistrationReceipt({
   required DateTime registrationDate,
   required String studentName,
   required List<FeeModel> selectedFees,
+  required int tuitionFee,
+  required String? dormitoryLabel,
+  required int dormitoryFee,
   required int totalFee,
   required int discountAmount,
   required int netFee,
@@ -41,6 +51,9 @@ Future<void> downloadRegistrationReceipt({
     registrationDate: registrationDate,
     studentName: studentName,
     selectedFees: selectedFees,
+    tuitionFee: tuitionFee,
+    dormitoryLabel: dormitoryLabel,
+    dormitoryFee: dormitoryFee,
     totalFee: totalFee,
     discountAmount: discountAmount,
     netFee: netFee,
@@ -89,11 +102,47 @@ Future<Uint8List> _buildReceiptPdf({
   required DateTime registrationDate,
   required String studentName,
   required List<FeeModel> selectedFees,
+  required int tuitionFee,
+  required String? dormitoryLabel,
+  required int dormitoryFee,
   required int totalFee,
   required int discountAmount,
   required int netFee,
   FutureOr<void> Function(String title, String message)? onStageChanged,
 }) async {
+  if (_shouldUseServerReceiptRenderer()) {
+    try {
+      await _notifyReceiptStage(
+        onStageChanged,
+        title: 'ກຳລັງປະກອບ PDF',
+        message: 'ລະບົບກຳລັງສົ່ງຂໍ້ມູນໄປສ້າງ PDF ທີ່ server.',
+      );
+
+      return await _registrationService.createRegistrationReceiptPdf(
+        registrationId: registrationId,
+        registrationDate: registrationDate,
+        studentName: studentName,
+        selectedFees: selectedFees
+            .map(
+              (fee) => {
+                'subject_name': fee.subjectName,
+                'level_name': fee.levelName,
+                'fee': fee.fee.toInt(),
+              },
+            )
+            .toList(growable: false),
+        tuitionFee: tuitionFee,
+        dormitoryLabel: dormitoryLabel,
+        dormitoryFee: dormitoryFee,
+        totalFee: totalFee,
+        discountAmount: discountAmount,
+        netFee: netFee,
+      );
+    } catch (_) {
+      // Fall back to local PDF generation if the API endpoint is unavailable.
+    }
+  }
+
   await _notifyReceiptStage(
     onStageChanged,
     title: 'ກຳລັງສ້າງຮູບໃບລົງທະບຽນ',
@@ -105,11 +154,30 @@ Future<Uint8List> _buildReceiptPdf({
     registrationDate: registrationDate,
     studentName: studentName,
     selectedFees: selectedFees,
+    tuitionFee: tuitionFee,
+    dormitoryLabel: dormitoryLabel,
+    dormitoryFee: dormitoryFee,
     totalFee: totalFee,
     discountAmount: discountAmount,
     netFee: netFee,
   );
 
+  await _notifyReceiptStage(
+    onStageChanged,
+    title: 'ກຳລັງປະກອບ PDF',
+    message: 'ລະບົບກຳລັງນຳຮູບໃບລົງທະບຽນໄປປະກອບເປັນໄຟລ໌ PDF.',
+  );
+
+  await Future<void>.delayed(const Duration(milliseconds: 16));
+
+  if (kIsWeb) {
+    return _composeReceiptPdf(receiptImageBytes);
+  }
+
+  return compute(_composeReceiptPdf, receiptImageBytes);
+}
+
+Future<Uint8List> _composeReceiptPdf(Uint8List receiptImageBytes) {
   final document = pw.Document();
   final receiptImage = pw.MemoryImage(receiptImageBytes);
 
@@ -123,12 +191,6 @@ Future<Uint8List> _buildReceiptPdf({
         );
       },
     ),
-  );
-
-  await _notifyReceiptStage(
-    onStageChanged,
-    title: 'ກຳລັງປະກອບ PDF',
-    message: 'ລະບົບກຳລັງນຳຮູບໃບລົງທະບຽນໄປປະກອບເປັນໄຟລ໌ PDF.',
   );
 
   return document.save();
@@ -152,11 +214,14 @@ Future<Uint8List> _buildReceiptImage({
   required DateTime registrationDate,
   required String studentName,
   required List<FeeModel> selectedFees,
+  required int tuitionFee,
+  required String? dormitoryLabel,
+  required int dormitoryFee,
   required int totalFee,
   required int discountAmount,
   required int netFee,
 }) async {
-  final renderScale = kIsWeb ? 0.72 : 1.0;
+  final renderScale = kIsWeb ? 0.62 : 0.9;
   final pageWidth = 1240.0 * renderScale;
   final pageHeight = 1754.0 * renderScale;
   final fontScale = 1.4 * renderScale;
@@ -383,25 +448,33 @@ Future<Uint8List> _buildReceiptImage({
   );
 
   var infoY = headerRuleY + 182;
-  final infoLabelWidth = 228.0;
-  final infoColumnGap = 8.0;
-  final infoValueX = horizontalPadding + infoLabelWidth + infoColumnGap;
-  final infoValueWidth = pageWidth - infoValueX - horizontalPadding;
-
   final registrationLabelPainter = layoutText(
     'ລະຫັດໃບລົງທະບຽນ:',
     infoLabelStyle,
-    maxWidth: infoLabelWidth,
     maxLines: 1,
   );
+  final studentLabelPainter = layoutText(
+    'ຊື່ ແລະ ນາມສະກຸນ:',
+    infoLabelStyle,
+    maxLines: 1,
+  );
+  final infoColumnGap = 6.0 * renderScale;
+  final registrationValueX =
+      horizontalPadding + registrationLabelPainter.width + infoColumnGap;
+  final registrationValueWidth =
+      pageWidth - registrationValueX - horizontalPadding;
+  final studentValueX =
+      horizontalPadding + studentLabelPainter.width + infoColumnGap;
+  final studentValueWidth = pageWidth - studentValueX - horizontalPadding;
+
   final registrationValuePainter = layoutText(
     registrationId,
     infoValueStyle,
-    maxWidth: infoValueWidth,
+    maxWidth: registrationValueWidth,
     maxLines: 1,
   );
   registrationLabelPainter.paint(canvas, Offset(horizontalPadding, infoY));
-  registrationValuePainter.paint(canvas, Offset(infoValueX, infoY));
+  registrationValuePainter.paint(canvas, Offset(registrationValueX, infoY));
 
   infoY +=
       math.max(
@@ -410,20 +483,14 @@ Future<Uint8List> _buildReceiptImage({
       ) +
       14;
 
-  final studentLabelPainter = layoutText(
-    'ຊື່ ແລະ ນາມສະກຸນ:',
-    infoLabelStyle,
-    maxWidth: infoLabelWidth,
-    maxLines: 1,
-  );
   final studentValuePainter = layoutText(
     studentName,
     infoValueStyle,
-    maxWidth: infoValueWidth,
+    maxWidth: studentValueWidth,
     maxLines: 2,
   );
   studentLabelPainter.paint(canvas, Offset(horizontalPadding, infoY));
-  studentValuePainter.paint(canvas, Offset(infoValueX, infoY));
+  studentValuePainter.paint(canvas, Offset(studentValueX, infoY));
 
   var tableY =
       infoY +
@@ -520,7 +587,7 @@ Future<Uint8List> _buildReceiptImage({
     tableY += 18;
   }
 
-  var summaryY = tableY + 56;
+  var summaryY = tableY + 28;
   final summaryRight = tableRight;
   final summaryValueWidth = 220.0;
   final summaryGap = 26.0;
@@ -541,7 +608,7 @@ Future<Uint8List> _buildReceiptImage({
     maxWidth: summaryValueWidth,
   );
 
-  summaryY += 42;
+  summaryY += 30;
   if (discountAmount > 0) {
     paintText(
       'ສ່ວນຫຼຸດ:',
@@ -557,9 +624,9 @@ Future<Uint8List> _buildReceiptImage({
       textAlign: TextAlign.right,
       maxWidth: summaryValueWidth,
     );
-    summaryY += 40;
+    summaryY += 28;
   } else {
-    summaryY += 8;
+    summaryY += 4;
   }
 
   drawDashedLine(
@@ -570,7 +637,7 @@ Future<Uint8List> _buildReceiptImage({
     gapWidth: 5,
   );
 
-  summaryY += 26;
+  summaryY += 14;
   paintText(
     'ຕ້ອງຈ່າຍ:',
     amountDueLabelStyle,
@@ -586,7 +653,7 @@ Future<Uint8List> _buildReceiptImage({
     maxWidth: summaryValueWidth,
   );
 
-  final footerLineY = math.min(summaryY + 108, pageHeight - 170);
+  final footerLineY = math.min(summaryY + 88, pageHeight - 170);
   drawDashedLine(
     start: Offset(horizontalPadding, footerLineY),
     width: pageWidth - (horizontalPadding * 2),

@@ -1,4 +1,3 @@
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:palee_web_portfolio/utils/http_helper.dart';
@@ -6,8 +5,9 @@ import 'package:palee_web_portfolio/utils/http_helper.dart';
 import '../models/registration_model.dart';
 import '../services/registration_service.dart';
 
-final registrationServiceProvider =
-    Provider<RegistrationService>((_) => RegistrationService());
+final registrationServiceProvider = Provider<RegistrationService>(
+  (_) => RegistrationService(),
+);
 
 class RegistrationState {
   final List<RegistrationModel> registrations;
@@ -46,10 +46,7 @@ class RegistrationNotifier extends StateNotifier<RegistrationState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final response = await _service.getRegistrations();
-      state = state.copyWith(
-        registrations: response.data,
-        isLoading: false,
-      );
+      state = state.copyWith(registrations: response.data, isLoading: false);
     } catch (e) {
       state = state.copyWith(error: e.toString(), isLoading: false);
     }
@@ -80,8 +77,13 @@ class RegistrationNotifier extends StateNotifier<RegistrationState> {
       );
       return true;
     } on ValidationException catch (e) {
-      final errorDetails = e.errors?.map((err) => err['msg'] as String? ?? '').join('\n');
-      state = state.copyWith(error: errorDetails ?? e.message, isCreating: false);
+      final errorDetails = e.errors
+          ?.map((err) => err['msg'] as String? ?? '')
+          .join('\n');
+      state = state.copyWith(
+        error: errorDetails ?? e.message,
+        isCreating: false,
+      );
       return false;
     } catch (e) {
       state = state.copyWith(error: e.toString(), isCreating: false);
@@ -103,8 +105,13 @@ class RegistrationNotifier extends StateNotifier<RegistrationState> {
       );
       return true;
     } on ValidationException catch (e) {
-      final errorDetails = e.errors?.map((err) => err['msg'] as String? ?? '').join('\n');
-      state = state.copyWith(error: errorDetails ?? e.message, isCreating: false);
+      final errorDetails = e.errors
+          ?.map((err) => err['msg'] as String? ?? '')
+          .join('\n');
+      state = state.copyWith(
+        error: errorDetails ?? e.message,
+        isCreating: false,
+      );
       return false;
     } catch (e) {
       state = state.copyWith(error: e.toString(), isCreating: false);
@@ -113,7 +120,9 @@ class RegistrationNotifier extends StateNotifier<RegistrationState> {
   }
 
   Future<bool> updateRegistration(
-      String registrationId, RegistrationRequest request) async {
+    String registrationId,
+    RegistrationRequest request,
+  ) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
       await _service.updateRegistration(registrationId, request);
@@ -143,11 +152,11 @@ class RegistrationNotifier extends StateNotifier<RegistrationState> {
   }
 
   void clearError() => state = state.copyWith(error: null);
+
+  void resetState() => state = RegistrationState();
 }
 
 final registrationProvider =
     StateNotifierProvider<RegistrationNotifier, RegistrationState>(
-  (ref) => RegistrationNotifier(
-    ref.read(registrationServiceProvider),
-  ),
-);
+      (ref) => RegistrationNotifier(ref.read(registrationServiceProvider)),
+    );
