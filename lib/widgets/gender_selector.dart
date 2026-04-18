@@ -20,59 +20,60 @@ class GenderSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(
-          child: _tile('ຊາຍ', Icons.male_rounded, const Color(0xFF3B82F6)),
-        ),
+        Expanded(child: _tile('ຊາຍ', Colors.blue)),
         const SizedBox(width: 10),
-        Expanded(
-          child: _tile('ຍິງ', Icons.female_rounded, const Color(0xFFEC4899)),
-        ),
+        Expanded(child: _tile('ຍິງ', Colors.pink)),
       ],
     );
   }
 
-  Widget _tile(String value, IconData icon, Color color) {
+  Widget _tile(String value, Color color) {
     final isSelected = selected == value;
-    return GestureDetector(
-      onTap: () => onChanged(value),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        height: 56,
-        decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.08) : surfaceColor,
+    return Semantics(
+      inMutuallyExclusiveGroup: true,
+      checked: isSelected,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isSelected ? color : borderColor,
-            width: isSelected ? 2 : 1.5,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: isSelected ? color : textColor, size: 22),
-            const SizedBox(width: 8),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-                color: isSelected ? color : textColor,
+          onTap: () => onChanged(value),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            height: 56,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              color: isSelected ? color.withValues(alpha: 0.08) : surfaceColor,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isSelected ? color : borderColor,
+                width: isSelected ? 2 : 1.5,
               ),
             ),
-            if (isSelected) ...[
-              const SizedBox(width: 8),
-              Container(
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-                child: const Icon(
-                  Icons.check_rounded,
-                  size: 16,
-                  color: Colors.white,
+            child: Row(
+              children: [
+                Radio<String>(
+                  value: value,
+                  groupValue: selected,
+                  onChanged: onChanged,
+                  activeColor: color,
+                  visualDensity: VisualDensity.compact,
                 ),
-              ),
-            ],
-          ],
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w400,
+                      color: isSelected ? color : textColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

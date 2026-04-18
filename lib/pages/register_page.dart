@@ -1623,7 +1623,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
       children: [
         // Page heading
         _buildFormHeader(),
-        const SizedBox(height: 32),
+        const SizedBox(height: 16),
 
         // Form body
         Skeletonizer(
@@ -1817,32 +1817,24 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
       children: [
         _sectionLabel('ຂໍ້ມູນສ່ວນຕົວ', Icons.person_outline_rounded),
         const SizedBox(height: 14),
-        Row(
-          children: [
-            Expanded(
-              child: AppTextField(
-                controller: _firstNameController,
-                focusNode: _firstNameFocusNode,
-                labelText: 'ຊື່',
-                hintText: 'ກະລຸນາປ້ອນຊື່',
-                textInputAction: TextInputAction.next,
-                onFieldSubmitted: (_) => _focusNext(_lastNameFocusNode),
-                validator: (v) => _validateRequired(v, 'ຊື່'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: AppTextField(
-                controller: _lastNameController,
-                focusNode: _lastNameFocusNode,
-                labelText: 'ນາມສະກຸນ',
-                hintText: 'ກະລຸນາປ້ອນນາມສະກຸນ',
-                textInputAction: TextInputAction.next,
-                onFieldSubmitted: (_) => _focusNext(_studentContactFocusNode),
-                validator: (v) => _validateRequired(v, 'ນາມສະກຸນ'),
-              ),
-            ),
-          ],
+        AppTextField(
+          controller: _firstNameController,
+          focusNode: _firstNameFocusNode,
+          labelText: 'ຊື່',
+          hintText: 'ປ້ອນຊື່',
+          textInputAction: TextInputAction.next,
+          onFieldSubmitted: (_) => _focusNext(_lastNameFocusNode),
+          validator: (v) => _validateRequired(v, 'ຊື່'),
+        ),
+        const SizedBox(height: 14),
+        AppTextField(
+          controller: _lastNameController,
+          focusNode: _lastNameFocusNode,
+          labelText: 'ນາມສະກຸນ',
+          hintText: 'ປ້ອນນາມສະກຸນ',
+          textInputAction: TextInputAction.next,
+          onFieldSubmitted: (_) => _focusNext(_studentContactFocusNode),
+          validator: (v) => _validateRequired(v, 'ນາມສະກຸນ'),
         ),
         const SizedBox(height: 14),
         GenderSelector(
@@ -1858,7 +1850,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
           focusNode: _studentContactFocusNode,
           keyboardType: TextInputType.phone,
           labelText: 'ເບີໂທນັກຮຽນ',
-          hintText: 'ກະລຸນາປ້ອນເບີໂທນັກຮຽນ(020XXXXXXXX)',
+          hintText: 'ປ້ອນເບີໂທ(020XXXXXXXX)',
           textInputAction: TextInputAction.next,
           onFieldSubmitted: (_) => _focusNext(_parentsContactFocusNode),
           validator: (v) => _validatePhone(v, 'ເບີໂທນັກຮຽນ'),
@@ -1871,7 +1863,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
           focusNode: _parentsContactFocusNode,
           keyboardType: TextInputType.phone,
           labelText: 'ເບີໂທພໍ່ແມ່',
-          hintText: 'ກະລຸນາປ້ອນເບີໂທພໍ່ແມ່(020XXXXXXXX ຫຼື 030XXXXXXX)',
+          hintText: 'ປ້ອນເບີໂທພໍ່ແມ່(020XXXXXXXX ຫຼື 030XXXXXXX)',
           textInputAction: TextInputAction.next,
           onFieldSubmitted: (_) => _focusNext(_schoolFocusNode),
           validator: (v) => _validatePhone(v, 'ເບີໂທພໍ່ແມ່'),
@@ -1883,7 +1875,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
           controller: _schoolController,
           focusNode: _schoolFocusNode,
           labelText: 'ໂຮງຮຽນ',
-          hintText: 'ກະລຸນາປ້ອນຊື່ໂຮງຮຽນ(ຕົວຢ່າງ ມສ ວຽງຈັນ, ມສ ຈອມເພັດ)',
+          hintText: 'ປ້ອນຊື່ໂຮງຮຽນ(ຕົວຢ່າງ: ມສ ວຽງຈັນ)',
           textInputAction: TextInputAction.next,
           onFieldSubmitted: (_) => _focusNextField(context),
           validator: (v) => _validateRequired(v, 'ຊື່ໂຮງຮຽນ'),
