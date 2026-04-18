@@ -18,6 +18,7 @@ import 'package:palee_web_portfolio/utils/registration_receipt_downloader.dart';
 import 'package:palee_web_portfolio/widgets/app_text_field.dart';
 import 'package:palee_web_portfolio/widgets/app_dropdown_field.dart';
 import 'package:palee_web_portfolio/widgets/fee_selection_widget.dart';
+import 'package:palee_web_portfolio/widgets/gender_selector.dart';
 import 'package:palee_web_portfolio/models/province_model.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -80,6 +81,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
   final _studentContactController = TextEditingController();
   final _parentsContactController = TextEditingController();
   final _schoolController = TextEditingController();
+  final _firstNameFocusNode = FocusNode();
+  final _lastNameFocusNode = FocusNode();
+  final _studentContactFocusNode = FocusNode();
+  final _parentsContactFocusNode = FocusNode();
+  final _schoolFocusNode = FocusNode();
 
   String? _selectedGender;
   String? _selectedProvince;
@@ -160,6 +166,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
     _studentContactController.dispose();
     _parentsContactController.dispose();
     _schoolController.dispose();
+    _firstNameFocusNode.dispose();
+    _lastNameFocusNode.dispose();
+    _studentContactFocusNode.dispose();
+    _parentsContactFocusNode.dispose();
+    _schoolFocusNode.dispose();
     super.dispose();
   }
 
@@ -188,6 +199,14 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
   String _errMsg(dynamic e) {
     final raw = e.toString();
     return raw.startsWith('Exception: ') ? raw.substring(11) : raw;
+  }
+
+  void _focusNext(FocusNode nextFocusNode) {
+    nextFocusNode.requestFocus();
+  }
+
+  void _focusNextField(BuildContext context) {
+    FocusScope.of(context).nextFocus();
   }
 
   void _showErrorOnce(String msg) {
@@ -1428,7 +1447,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                 const SizedBox(width: 12),
                 const Expanded(
                   child: Text(
-                    'ສູນປາລີ — ລົງທະບຽນນັກຮຽນ',
+                    'ສູນປາລີ ປຳລຸງນັກຮຽນເກັ່ງ',
                     style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w700,
@@ -1803,8 +1822,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
             Expanded(
               child: AppTextField(
                 controller: _firstNameController,
+                focusNode: _firstNameFocusNode,
                 labelText: 'ຊື່',
                 hintText: 'ກະລຸນາປ້ອນຊື່',
+                textInputAction: TextInputAction.next,
+                onFieldSubmitted: (_) => _focusNext(_lastNameFocusNode),
                 validator: (v) => _validateRequired(v, 'ຊື່'),
               ),
             ),
@@ -1812,24 +1834,33 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
             Expanded(
               child: AppTextField(
                 controller: _lastNameController,
+                focusNode: _lastNameFocusNode,
                 labelText: 'ນາມສະກຸນ',
                 hintText: 'ກະລຸນາປ້ອນນາມສະກຸນ',
+                textInputAction: TextInputAction.next,
+                onFieldSubmitted: (_) => _focusNext(_studentContactFocusNode),
                 validator: (v) => _validateRequired(v, 'ນາມສະກຸນ'),
               ),
             ),
           ],
         ),
         const SizedBox(height: 14),
-        _GenderSelector(
+        GenderSelector(
           selected: _selectedGender,
           onChanged: (v) => setState(() => _selectedGender = v),
+          surfaceColor: _surface,
+          borderColor: _border,
+          textColor: _textSecondary,
         ),
         const SizedBox(height: 14),
         AppTextField(
           controller: _studentContactController,
+          focusNode: _studentContactFocusNode,
           keyboardType: TextInputType.phone,
           labelText: 'ເບີໂທນັກຮຽນ',
           hintText: 'ກະລຸນາປ້ອນເບີໂທນັກຮຽນ(020XXXXXXXX)',
+          textInputAction: TextInputAction.next,
+          onFieldSubmitted: (_) => _focusNext(_parentsContactFocusNode),
           validator: (v) => _validatePhone(v, 'ເບີໂທນັກຮຽນ'),
           digitOnly: DigitOnly.integer,
           inputFormatters: const [_phoneNumberFormatter],
@@ -1837,9 +1868,12 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
         const SizedBox(height: 14),
         AppTextField(
           controller: _parentsContactController,
+          focusNode: _parentsContactFocusNode,
           keyboardType: TextInputType.phone,
           labelText: 'ເບີໂທພໍ່ແມ່',
           hintText: 'ກະລຸນາປ້ອນເບີໂທພໍ່ແມ່(020XXXXXXXX ຫຼື 030XXXXXXX)',
+          textInputAction: TextInputAction.next,
+          onFieldSubmitted: (_) => _focusNext(_schoolFocusNode),
           validator: (v) => _validatePhone(v, 'ເບີໂທພໍ່ແມ່'),
           digitOnly: DigitOnly.integer,
           inputFormatters: const [_phoneNumberFormatter],
@@ -1847,8 +1881,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
         const SizedBox(height: 14),
         AppTextField(
           controller: _schoolController,
+          focusNode: _schoolFocusNode,
           labelText: 'ໂຮງຮຽນ',
-          hintText: 'ກະລຸນາປ້ອນຊື່ໂຮງຮຽນ',
+          hintText: 'ກະລຸນາປ້ອນຊື່ໂຮງຮຽນ(ຕົວຢ່າງ ມສ ວຽງຈັນ, ມສ ຈອມເພັດ)',
+          textInputAction: TextInputAction.next,
+          onFieldSubmitted: (_) => _focusNextField(context),
           validator: (v) => _validateRequired(v, 'ຊື່ໂຮງຮຽນ'),
         ),
         const SizedBox(height: 28),
@@ -2214,76 +2251,6 @@ class _DottedRoundedBorderPainter extends CustomPainter {
         oldDelegate.strokeWidth != strokeWidth ||
         oldDelegate.dashWidth != dashWidth ||
         oldDelegate.dashGap != dashGap;
-  }
-}
-
-// ─── Gender selector widget ───────────────────────────────────────────────────
-class _GenderSelector extends StatelessWidget {
-  final String? selected;
-  final ValueChanged<String?> onChanged;
-
-  const _GenderSelector({required this.selected, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _tile('ຊາຍ', Icons.male_rounded, const Color(0xFF3B82F6)),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _tile('ຍິງ', Icons.female_rounded, const Color(0xFFEC4899)),
-        ),
-      ],
-    );
-  }
-
-  Widget _tile(String value, IconData icon, Color color) {
-    final isSelected = selected == value;
-    return GestureDetector(
-      onTap: () => onChanged(value),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        height: 56,
-        decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.08) : _surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isSelected ? color : _border,
-            width: isSelected ? 2 : 1.5,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: isSelected ? color : _textSecondary, size: 22),
-            const SizedBox(width: 8),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-                color: isSelected ? color : _textSecondary,
-              ),
-            ),
-            if (isSelected) ...[
-              const SizedBox(width: 8),
-              Container(
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-                child: const Icon(
-                  Icons.check_rounded,
-                  size: 16,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
   }
 }
 

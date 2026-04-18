@@ -14,6 +14,10 @@ import 'package:palee_web_portfolio/widgets/modern_contact_card.dart';
 class ContactSection extends StatelessWidget {
   const ContactSection({super.key});
 
+  static const LatLng _centerLocation = LatLng(18.049194, 102.646194);
+  static const String _googleMapsUrl =
+      'https://maps.app.goo.gl/Jp7KoGinLauhTdBo7';
+
   TileProvider? _buildTileProvider() {
     if (!kIsWeb) {
       return null;
@@ -26,82 +30,187 @@ class ContactSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
     final isMobile = ResponsiveHelper.isMobile(context);
-    final isTablet = ResponsiveHelper.isTablet(context);
+    final contentWidth = ResponsiveHelper.getMaxContentWidth(context);
 
     return Container(
       width: double.infinity,
       constraints: BoxConstraints(minHeight: screenHeight),
-      child: SingleChildScrollView(
-        padding: ResponsiveHelper.getResponsivePadding(context),
-        child: Column(
-          children: [
-            // Header
-            _buildHeader(context, isMobile, isTablet),
-            SizedBox(
-              height: ResponsiveHelper.getResponsiveSpacing(
-                context,
-                mobile: 20,
-                tablet: 30,
-                desktop: 40,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFF7FAFF), Color(0xFFEEF4FF)],
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: -120,
+            left: -80,
+            child: _buildGlowOrb(
+              size: 280,
+              colors: const [Color(0xFF93C5FD), Color(0x0093C5FD)],
+            ),
+          ),
+          Positioned(
+            right: -120,
+            top: 140,
+            child: _buildGlowOrb(
+              size: 340,
+              colors: const [Color(0xFFF9A8D4), Color(0x00F9A8D4)],
+            ),
+          ),
+          Positioned(
+            bottom: -140,
+            left: 120,
+            child: _buildGlowOrb(
+              size: 320,
+              colors: const [Color(0xFF86EFAC), Color(0x0086EFAC)],
+            ),
+          ),
+          SingleChildScrollView(
+            padding: ResponsiveHelper.getResponsivePadding(context),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: contentWidth),
+                child: Column(
+                  children: [
+                    _buildHeader(context, isMobile),
+                    SizedBox(
+                      height: ResponsiveHelper.getResponsiveSpacing(
+                        context,
+                        mobile: 28,
+                        tablet: 36,
+                        desktop: 44,
+                      ),
+                    ),
+                    _buildContactCards(context, isMobile),
+                    SizedBox(
+                      height: ResponsiveHelper.getResponsiveSpacing(
+                        context,
+                        mobile: 24,
+                        tablet: 30,
+                        desktop: 36,
+                      ),
+                    ),
+                    _buildMapSection(context, isMobile),
+                  ],
+                ),
               ),
             ),
-            // Contact Cards
-            _buildContactCards(context, isMobile),
-            SizedBox(
-              height: ResponsiveHelper.getResponsiveSpacing(
-                context,
-                mobile: 20,
-                tablet: 30,
-                desktop: 40,
-              ),
-            ),
-            // Map Section
-            _buildMapSection(context, isMobile),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGlowOrb({required double size, required List<Color> colors}) {
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(colors: colors),
         ),
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context, bool isMobile, bool isTablet) {
+  Widget _buildHeader(BuildContext context, bool isMobile) {
     return AnimatedSection(
-      child: Column(
-        children: [
-          Text(
-            'ຕິດຕໍ່ພວກເຮົາ',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: ResponsiveHelper.getResponsiveFontSize(
-                context,
-                mobile: 26,
-                tablet: 30,
-                desktop: 40,
-              ),
-              fontWeight: FontWeight.w900,
-              height: 1.1,
-              letterSpacing: -1.5,
-            ),
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(
+          ResponsiveHelper.getResponsiveSpacing(
+            context,
+            mobile: 24,
+            tablet: 30,
+            desktop: 36,
           ),
-          const SizedBox(height: 20),
-          Container(
-            constraints: const BoxConstraints(maxWidth: 600),
-            child: Text(
-              'ພ້ອມທີ່ຈະໃຫ້ຄຳປຶກສາ ແລະ ຊ່ວຍເຫຼືອທ່ານທຸກເວລາ',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: ResponsiveHelper.getResponsiveFontSize(
-                  context,
-                  mobile: 16,
-                  tablet: 17,
-                  desktop: 18,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.75),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: const Color(0xFFBFDBFE).withValues(alpha: 0.7),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF2563EB).withValues(alpha: 0.08),
+              blurRadius: 50,
+              offset: const Offset(0, 24),
+              spreadRadius: -18,
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFDBEAFE), Color(0xFFE0F2FE)],
                 ),
-                color: const Color(0xFF64748b),
-                height: 1.7,
-                fontWeight: FontWeight.w500,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                'ຕິດຕໍ່ພວກເຮົາ',
+                style: TextStyle(
+                  fontSize: ResponsiveHelper.getResponsiveFontSize(
+                    context,
+                    mobile: 16,
+                    tablet: 22,
+                    desktop: 28,
+                  ),
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF1D4ED8),
+                  letterSpacing: 1.1,
+                ),
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 18),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: Text(
+                'ພ້ອມຮັບຄຳຖາມ, ປຶກສາແຜນການຮຽນ ແລະ ຊ່ວຍເລືອກຊ່ອງທາງຕິດຕໍ່ທີ່ໄວທີ່ສຸດໃຫ້ທ່ານ. ເລືອກຊ່ອງທາງທີ່ສະດວກແລ້ວພວກເຮົາຈະຕອບກັບໂດຍໄວ.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: ResponsiveHelper.getResponsiveFontSize(
+                    context,
+                    mobile: 15.5,
+                    tablet: 17,
+                    desktop: 18.5,
+                  ),
+                  color: const Color(0xFF475569),
+                  height: 1.75,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            const SizedBox(height: 22),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 12,
+              runSpacing: 12,
+              children: const [
+                _ContactHighlightChip(
+                  icon: Icons.schedule_rounded,
+                  text: 'ຕອບກັບໄວ',
+                ),
+                _ContactHighlightChip(
+                  icon: Icons.support_agent_rounded,
+                  text: 'ໃຫ້ຄຳປຶກສາໄດ້',
+                ),
+                _ContactHighlightChip(
+                  icon: Icons.location_city_rounded,
+                  text: 'ມີແຜນທີ່ຊັດເຈນ',
+                ),
+              ],
+            ),
+            if (!isMobile) const SizedBox(height: 6),
+          ],
+        ),
       ),
     );
   }
@@ -111,25 +220,31 @@ class ContactSection extends StatelessWidget {
       {
         'icon': FontAwesomeIcons.whatsapp,
         'title': 'WhatsApp',
+        'subtitle': 'ແຊັດໄດ້ທັນທີ',
         'info': '+856 20 55061124',
-        'color': Colors.greenAccent.shade400,
-        'accentColor': Colors.greenAccent.shade400,
+        'actionLabel': 'ເປີດແຊັດ WhatsApp',
+        'color': const Color(0xFF22C55E),
+        'accentColor': const Color(0xFF16A34A),
         'action': ContactHelper.openWhatsApp,
       },
       {
         'icon': FontAwesomeIcons.facebook,
         'title': 'Facebook',
+        'subtitle': 'ຂ່າວສານ ແລະ ຂໍ້ມູນອັບເດດ',
         'info': 'PALEE ELITE Training Center',
-        'color': Colors.blue.shade900,
-        'accentColor': Colors.blue.shade900,
+        'actionLabel': 'ເຂົ້າເບິ່ງ Facebook Page',
+        'color': const Color(0xFF2563EB),
+        'accentColor': const Color(0xFF1D4ED8),
         'action': ContactHelper.openFacebook,
       },
       {
         'icon': Icons.email_rounded,
         'title': 'E-mail',
+        'subtitle': 'ສົ່ງຂໍ້ຄວາມ',
         'info': 'juyapaly@gmail.com',
-        'color': Colors.purple.shade200,
-        'accentColor': Colors.purple.shade200,
+        'actionLabel': 'ຂຽນອີເມວຫາພວກເຮົາ',
+        'color': const Color(0xFFF97316),
+        'accentColor': const Color(0xFFEA580C),
         'action': ContactHelper.sendEmail,
       },
     ];
@@ -138,42 +253,31 @@ class ContactSection extends StatelessWidget {
       delay: const Duration(milliseconds: 150),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          if (isMobile) {
-            return Column(
-              children: [
-                for (var card in contactCards) ...[
-                  ModernContactCard(
+          final availableWidth = constraints.maxWidth;
+          final cardWidth = isMobile
+              ? availableWidth
+              : (availableWidth - 24 * 2) / 3;
+
+          return Wrap(
+            spacing: 24,
+            runSpacing: 24,
+            children: [
+              for (final card in contactCards)
+                SizedBox(
+                  width: cardWidth,
+                  child: ModernContactCard(
                     icon: card['icon'] as IconData,
                     title: card['title'] as String,
+                    subtitle: card['subtitle'] as String,
                     info: card['info'] as String,
+                    actionLabel: card['actionLabel'] as String,
                     color: card['color'] as Color,
                     accentColor: card['accentColor'] as Color,
                     onTap: card['action'] as VoidCallback,
                   ),
-                  const SizedBox(height: 20),
-                ],
-              ],
-            );
-          } else {
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (var card in contactCards) ...[
-                  Expanded(
-                    child: ModernContactCard(
-                      icon: card['icon'] as IconData,
-                      title: card['title'] as String,
-                      info: card['info'] as String,
-                      color: card['color'] as Color,
-                      accentColor: card['accentColor'] as Color,
-                      onTap: card['action'] as VoidCallback,
-                    ),
-                  ),
-                  const SizedBox(width: 24),
-                ],
-              ],
-            );
-          }
+                ),
+            ],
+          );
         },
       ),
     );
@@ -182,234 +286,238 @@ class ContactSection extends StatelessWidget {
   Widget _buildMapSection(BuildContext context, bool isMobile) {
     return AnimatedSection(
       delay: const Duration(milliseconds: 300),
-      child: Container(
-        //constraints: const BoxConstraints(maxWidth: 1000),
-        padding: EdgeInsets.all(
-          ResponsiveHelper.getResponsiveSpacing(
-            context,
-            mobile: 24,
-            tablet: 28,
-            desktop: 32,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stacked = isMobile || constraints.maxWidth < 980;
+
+          if (stacked) {
+            return _buildMapCanvas(context);
+          }
+
+          return _buildMapCanvas(context);
+        },
+      ),
+    );
+  }
+
+  Widget _buildMapCanvas(BuildContext context) {
+    return Container(
+      height: ResponsiveHelper.getResponsiveSpacing(
+        context,
+        mobile: 320,
+        tablet: 380,
+        desktop: 430,
+      ),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.12),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.24),
+            blurRadius: 40,
+            offset: const Offset(0, 18),
+            spreadRadius: -14,
           ),
-        ),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.black.withOpacity(0.06), width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.blue.withOpacity(0.08),
-              blurRadius: 60,
-              offset: const Offset(0, 20),
-              spreadRadius: -10,
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Stack(
           children: [
-            Row(
+            FlutterMap(
+              options: MapOptions(
+                initialCenter: _centerLocation,
+                initialZoom: 17.0,
+                minZoom: 5.0,
+                maxZoom: 19.0,
+              ),
               children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade400,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.location_on_rounded,
-                    size: 28,
-                    color: Colors.white,
-                  ),
+                TileLayer(
+                  urlTemplate:
+                      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                  userAgentPackageName: 'com.example.app',
+                  tileProvider: _buildTileProvider(),
+                  maxZoom: 19,
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    'ສະຖານທີ່ຕັ້ງຂອງພວກເຮົາ',
-                    style: TextStyle(
-                      fontSize: ResponsiveHelper.getResponsiveFontSize(
-                        context,
-                        mobile: 16,
-                        tablet: 20,
-                        desktop: 24,
-                      ),
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF1a1a2e),
-                      letterSpacing: -0.5,
-                    ),
-                  ),
+                TileLayer(
+                  urlTemplate:
+                      'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+                  userAgentPackageName: 'com.example.app',
+                  tileProvider: _buildTileProvider(),
+                  maxZoom: 19,
                 ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            // Map Container
-            Container(
-              height: ResponsiveHelper.getResponsiveSpacing(
-                context,
-                mobile: 300,
-                tablet: 350,
-                desktop: 400,
-              ),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: Colors.black.withOpacity(0.06),
-                  width: 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF667eea).withOpacity(0.1),
-                    blurRadius: 30,
-                    offset: const Offset(0, 10),
-                    spreadRadius: -5,
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Stack(
-                  children: [
-                    FlutterMap(
-                      options: MapOptions(
-                        initialCenter: const LatLng(18.049194, 102.646194),
-                        initialZoom: 17.0,
-                        minZoom: 5.0,
-                        maxZoom: 19.0,
-                      ),
-                      children: [
-                        TileLayer(
-                          urlTemplate:
-                              'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                          userAgentPackageName: 'com.example.app',
-                          tileProvider: _buildTileProvider(),
-                          maxZoom: 19,
-                        ),
-                        TileLayer(
-                          urlTemplate:
-                              'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-                          userAgentPackageName: 'com.example.app',
-                          tileProvider: _buildTileProvider(),
-                          maxZoom: 19,
-                        ),
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              point: const LatLng(18.049194, 102.646194),
-                              width: 220,
-                              height: 120,
-                              alignment: Alignment.topCenter,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 14,
-                                      vertical: 8,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Text(
-                                      'ສູນປາລີບຳລຸງນັກຮຽນເກັ່ງ',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w900,
-                                        color: Colors.blue,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  const Icon(
-                                    Icons.location_on,
-                                    color: Colors.red,
-                                    size: 50,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    // Open in Google Maps button
-                    Positioned(
-                      top: 16,
-                      right: 16,
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.click,
-                        child: GestureDetector(
-                          onTap: () async {
-                            final url = Uri.parse(
-                              'https://maps.app.goo.gl/Jp7KoGinLauhTdBo7',
-                            );
-                            if (await canLaunchUrl(url)) {
-                              await launchUrl(
-                                url,
-                                mode: LaunchMode.externalApplication,
-                              );
-                            }
-                          },
-                          child: Container(
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: _centerLocation,
+                      width: 220,
+                      height: 120,
+                      alignment: Alignment.topCenter,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        children: [
+                          Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
+                              horizontal: 14,
+                              vertical: 8,
                             ),
                             decoration: BoxDecoration(
                               color: Colors.white,
-                              borderRadius: BorderRadius.circular(26),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.map_rounded,
-                                  size: 20,
-                                  color: Colors.blue.shade400,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Google Maps',
-                                  style: TextStyle(
-                                    fontSize:
-                                        ResponsiveHelper.getResponsiveFontSize(
-                                          context,
-                                          mobile: 12,
-                                          tablet: 12.5,
-                                          desktop: 13,
-                                        ),
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.blue.shade400,
-                                    letterSpacing: 0.3,
-                                  ),
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.15),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 8),
                                 ),
                               ],
                             ),
+                            child: const Text(
+                              'ສູນປາລີບຳລຸງນັກຮຽນເກັ່ງ',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF1D4ED8),
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 6),
+                          const Icon(
+                            Icons.location_on,
+                            color: Color(0xFFEF4444),
+                            size: 50,
+                          ),
+                        ],
                       ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            Positioned(
+              left: 16,
+              bottom: 16,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.65),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.08),
+                  ),
+                ),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'PALEE ELITE Training Center',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Vientiane Capital, Laos',
+                      style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 12),
                     ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 24),
-            Text(
-              'ບ້ານ ໜອງວຽງຄຳ, ເມືອງໄຊທານີ, ນະຄອນຫຼວງວຽງຈັນ',
-              style: TextStyle(
-                fontSize: ResponsiveHelper.getResponsiveFontSize(
-                  context,
-                  mobile: 15,
-                  tablet: 16,
-                  desktop: 17,
+            Positioned(
+              top: 16,
+              right: 16,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: _openMaps,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.map_rounded,
+                          size: 20,
+                          color: Color(0xFF2563EB),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'ເປີດນຳທາງໃນ Google Maps',
+                          style: TextStyle(
+                            fontSize: ResponsiveHelper.getResponsiveFontSize(
+                              context,
+                              mobile: 12,
+                              tablet: 12.5,
+                              desktop: 13,
+                            ),
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF2563EB),
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                color: const Color(0xFF1a1a2e),
-                fontWeight: FontWeight.w700,
-                height: 1.5,
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _openMaps() async {
+    final url = Uri.parse(_googleMapsUrl);
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    }
+  }
+}
+
+class _ContactHighlightChip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _ContactHighlightChip({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: const Color(0xFF2563EB)),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: const TextStyle(
+              color: Color(0xFF0F172A),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }

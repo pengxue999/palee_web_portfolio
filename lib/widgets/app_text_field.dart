@@ -11,7 +11,10 @@ class AppTextField extends StatefulWidget {
   final String? hintText;
   final IconData? prefixIcon;
   final String? prefixText;
+  final FocusNode? focusNode;
   final TextInputType keyboardType;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onFieldSubmitted;
   final String? Function(String?)? validator;
   final bool obscureText;
   final VoidCallback? onToggleObscure;
@@ -25,7 +28,10 @@ class AppTextField extends StatefulWidget {
     this.hintText,
     this.prefixIcon,
     this.prefixText,
+    this.focusNode,
     this.keyboardType = TextInputType.text,
+    this.textInputAction,
+    this.onFieldSubmitted,
     this.validator,
     this.obscureText = false,
     this.onToggleObscure,
@@ -39,16 +45,18 @@ class AppTextField extends StatefulWidget {
 
 class _AppTextFieldState extends State<AppTextField>
     with SingleTickerProviderStateMixin {
-  late final FocusNode _focusNode;
+  FocusNode? _internalFocusNode;
   late final AnimationController _animationController;
   late final Animation<double> _iconScaleAnimation;
   bool _isFocused = false;
   bool _hasError = false;
 
+  FocusNode get _focusNode => widget.focusNode ?? _internalFocusNode!;
+
   @override
   void initState() {
     super.initState();
-    _focusNode = FocusNode();
+    _internalFocusNode = widget.focusNode == null ? FocusNode() : null;
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 200),
@@ -57,6 +65,23 @@ class _AppTextFieldState extends State<AppTextField>
       CurvedAnimation(parent: _animationController, curve: Curves.easeOutBack),
     );
     _focusNode.addListener(_onFocusChange);
+  }
+
+  @override
+  void didUpdateWidget(covariant AppTextField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.focusNode != widget.focusNode) {
+      oldWidget.focusNode?.removeListener(_onFocusChange);
+      if (oldWidget.focusNode == null) {
+        _internalFocusNode?.removeListener(_onFocusChange);
+        _internalFocusNode?.dispose();
+      }
+
+      _internalFocusNode = widget.focusNode == null ? FocusNode() : null;
+      _focusNode.addListener(_onFocusChange);
+      _isFocused = _focusNode.hasFocus;
+    }
   }
 
   void _onFocusChange() {
@@ -71,7 +96,7 @@ class _AppTextFieldState extends State<AppTextField>
   @override
   void dispose() {
     _focusNode.removeListener(_onFocusChange);
-    _focusNode.dispose();
+    _internalFocusNode?.dispose();
     _animationController.dispose();
     super.dispose();
   }
@@ -140,6 +165,8 @@ class _AppTextFieldState extends State<AppTextField>
         controller: widget.controller,
         focusNode: _focusNode,
         keyboardType: widget.keyboardType,
+        textInputAction: widget.textInputAction,
+        onFieldSubmitted: widget.onFieldSubmitted,
         inputFormatters: inputFormatters.isEmpty ? null : inputFormatters,
         obscureText: widget.obscureText,
         validator: (value) {
