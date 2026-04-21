@@ -18,7 +18,7 @@ class HeroSection extends StatelessWidget {
       width: screenWidth,
       decoration: BoxDecoration(
         image: DecorationImage(
-          image: const AssetImage("assets/images/book-1.jpg"),
+          image: const AssetImage("assets/images/ppp.jpg"),
           fit: BoxFit.cover,
           colorFilter: ColorFilter.mode(
             Colors.blue.withOpacity(0.1),

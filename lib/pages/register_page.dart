@@ -759,7 +759,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                                               ),
                                             ),
                                             child: const Text(
-                                              'ຢືນຢັນ ແລະ ລົງທະບຽນ',
+                                              'ຢືນຢັນ',
                                               style: TextStyle(
                                                 fontWeight: FontWeight.w800,
                                               ),
