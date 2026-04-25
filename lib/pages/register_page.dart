@@ -2074,7 +2074,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
             );
           }),
           const SizedBox(height: 8),
-          _sectionLabel('ສະຫຼຸບຄ່າຮຽນ', Icons.receipt_long_outlined),
+          _sectionLabel(
+            'ສະຫຼຸບຄ່າຮຽນ ແລະ ຄ່າອື່ນໆ',
+            Icons.receipt_long_outlined,
+          ),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(16),
@@ -2106,7 +2109,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                 const Divider(height: 24),
 
                 _SummaryRow(
-                  label: 'ຕ້ອງຈ່າຍ',
+                  label: 'ຍອດເງິນທີ່ຕ້ອງຈ່າຍ',
                   value: '${_formatCurrency(_netFee)} ກີບ',
                   isEmphasis: true,
                 ),
@@ -2155,8 +2158,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                   onPressed: isBusy ? null : _handleNext,
                 )
               : _NavButton.filled(
-                  label: 'ລົງທະບຽນ',
-                  icon: Icons.check_circle_outline_rounded,
+                  label: 'ບັນທຶກ',
                   isLoading: isBusy,
                   onPressed: isBusy ? null : _confirmAndHandleRegister,
                 ),
@@ -2249,14 +2251,14 @@ class _DottedRoundedBorderPainter extends CustomPainter {
 // ─── Nav button ───────────────────────────────────────────────────────────────
 class _NavButton extends StatelessWidget {
   final String label;
-  final IconData icon;
+  final IconData? icon;
   final VoidCallback? onPressed;
   final bool _outlined;
   final bool isLoading;
 
   const _NavButton.filled({
     required this.label,
-    required this.icon,
+    this.icon,
     this.onPressed,
     this.isLoading = false,
   }) : _outlined = false;

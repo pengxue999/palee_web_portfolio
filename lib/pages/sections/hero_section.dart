@@ -21,7 +21,7 @@ class HeroSection extends StatelessWidget {
           image: const AssetImage("assets/images/ppp.jpg"),
           fit: BoxFit.cover,
           colorFilter: ColorFilter.mode(
-            Colors.blue.withOpacity(0.1),
+            Colors.black.withOpacity(0.2),
             BlendMode.darken,
           ),
         ),
@@ -259,37 +259,23 @@ class HeroSection extends StatelessWidget {
                           elevation: 8,
                           shadowColor: Colors.black.withOpacity(0.4),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.arrow_forward,
-                              size: ResponsiveHelper.getResponsiveFontSize(
-                                context,
-                                mobile: 20,
-                                tablet: 22,
-                                desktop: 24,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              'ລົງທະບຽນ',
-                              style: TextStyle(
-                                fontSize:
-                                    ResponsiveHelper.getResponsiveFontSize(
-                                      context,
-                                      mobile: 16,
-                                      tablet: 18,
-                                      desktop: 20,
-                                    ),
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          'ລົງທະບຽນ',
+                          style: TextStyle(
+                            fontSize:
+                                ResponsiveHelper.getResponsiveFontSize(
+                                  context,
+                                  mobile: 16,
+                                  tablet: 18,
+                                  desktop: 20,
+                                ),
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1,
+                          ),
                         ),
                       ),
                     ),
+                    
                     const SizedBox(height: 30),
                   ],
                 ),
