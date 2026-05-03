@@ -74,6 +74,8 @@ class RegisterPage extends ConsumerStatefulWidget {
 class _RegisterPageState extends ConsumerState<RegisterPage>
     with TickerProviderStateMixin {
   static const _phoneNumberFormatter = _PhoneNumberLengthFormatter();
+  static const String _mandatorySubjectName = 'ຄະນິດສາດຄິດໄວ';
+  static const int _mandatoryFeeAmount = 300000;
 
   final _formKey = GlobalKey<FormState>();
   final _firstNameController = TextEditingController();
@@ -114,7 +116,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
 
   static const Map<String, int> _dormitoryFees = <String, int>{
     'ຫໍພັກໃນ': 200000,
-    'ຫໍພັກນອກ': 100000,
+    'ຫໍພັກນອກ': 0,
   };
 
   // ── Steps metadata ─────────────────────────────────────────────────────────
@@ -268,15 +270,44 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
     ]);
   }
 
-  int get _tuitionFee {
+  String _normalizeSubjectName(String value) {
+    return value.replaceAll(RegExp(r'\s+'), '').trim();
+  }
+
+  bool _isMandatorySubject(FeeModel fee) {
+    final normalizedSubjectName = _normalizeSubjectName(fee.subjectName);
+    final normalizedMandatoryName = _normalizeSubjectName(
+      _mandatorySubjectName,
+    );
+    return normalizedSubjectName == normalizedMandatoryName ||
+        normalizedSubjectName.contains(normalizedMandatoryName);
+  }
+
+  List<FeeModel> get _selectedSubjectFees {
     final fees = ref.read(feeProvider).fees;
-    return _selectedFeeIds.fold<int>(0, (sum, feeId) {
-      final matched = fees.where((fee) => fee.feeId == feeId);
-      if (matched.isEmpty) {
-        return sum;
-      }
-      return sum + matched.first.fee.toInt();
-    });
+    return fees
+        .where(
+          (fee) =>
+              _selectedFeeIds.contains(fee.feeId) && !_isMandatorySubject(fee),
+        )
+        .toList(growable: false);
+  }
+
+  int get _selectedSubjectCount => _selectedSubjectFees.length;
+
+  int get _tuitionFee {
+    return _selectedSubjectFees.fold<int>(
+      0,
+      (sum, fee) => sum + fee.fee.toInt(),
+    );
+  }
+
+  int get _mandatoryFee {
+    return _selectedSubjectCount == 0 ? 0 : _mandatoryFeeAmount;
+  }
+
+  String get _mandatoryFeeLabel {
+    return 'ຄ່າວິຊາບັງຄັບ ($_mandatorySubjectName)';
   }
 
   bool get _shouldChargeDormitoryFee =>
@@ -303,13 +334,13 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
     }
 
     if (_selectedDormitory == 'ຫໍພັກນອກ') {
-      return 'ຄ່າອື່ນໆ(ຄ່າໄຟ)';
+      return 'ຄ່າອື່ນໆ';
     }
 
     return 'ຄ່າອື່ນໆ';
   }
 
-  int get _totalFee => _tuitionFee + _dormitoryFee;
+  int get _totalFee => _tuitionFee + _mandatoryFee + _dormitoryFee;
 
   int get _selectedDiscountAmount {
     final discount = _autoAppliedDiscount;
@@ -324,13 +355,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
 
   DiscountModel? get _autoAppliedDiscount {
     final discounts = ref.read(discountProvider).discounts;
-    final fees = ref.read(feeProvider).fees;
-    final selectedMathTrackCount = fees
-        .where(
-          (fee) =>
-              _selectedFeeIds.contains(fee.feeId) &&
-              fee.subjectCategory == 'ສາຍຄິດໄລ່',
-        )
+    final selectedMathTrackCount = _selectedSubjectFees
+        .where((fee) => fee.subjectCategory == 'ສາຍຄິດໄລ່')
         .length;
 
     if (selectedMathTrackCount < 3) {
@@ -373,7 +399,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
   }
 
   void _handleFeeSelectionChanged(Set<String> selectedIds) {
-    final hadLessOrEqualThree = _selectedFeeIds.length <= 3;
+    final hadLessOrEqualThree = _selectedSubjectCount <= 3;
     if (selectedIds.length > 3 && hadLessOrEqualThree) {
       _showSnack('ນັກຮຽນສາມາດລົງທະບຽນໄດ້ສູງສຸດ 3 ວິຊາ', isError: true);
       return;
@@ -551,11 +577,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
   }
 
   Future<bool> _showRegisterConfirmationDialog() async {
-    final selectedFees = ref
-        .read(feeProvider)
-        .fees
-        .where((fee) => _selectedFeeIds.contains(fee.feeId))
-        .toList();
+    final selectedFees = _selectedSubjectFees;
 
     return await showGeneralDialog<bool>(
           context: context,
@@ -929,11 +951,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
           ref.read(registrationProvider).registrations.isNotEmpty
           ? ref.read(registrationProvider).registrations.last
           : null;
-      final selectedFees = ref
-          .read(feeProvider)
-          .fees
-          .where((fee) => _selectedFeeIds.contains(fee.feeId))
-          .toList();
+      final selectedFees = _selectedSubjectFees;
       final receiptRegistrationId =
           (lastRegistration?.registrationId.isNotEmpty ?? false)
           ? lastRegistration!.registrationId
@@ -963,6 +981,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
           studentName: receiptStudentName,
           selectedFees: selectedFees,
           tuitionFee: _tuitionFee,
+          mandatoryLabel: _mandatoryFeeLabel,
+          mandatoryFee: _mandatoryFee,
           dormitoryLabel: _dormitoryFeeLabel,
           dormitoryFee: _dormitoryFee,
           totalFee: _totalFee,
@@ -1968,7 +1988,17 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  '- ນັກຮຽນທີ່ມາພັກຫໍພັກໃນ ຈະໄດ້ຊ່ວຍຈ່າຍນ້ຳ, ໄຟ ແລະ ຂີ້ເຫຍື້ອ 200,000 ກີບ.\n- ນັກຮຽນທີ່ພັກຫໍພັກນອກ ຈະໄດ້ຊ່ວຍຈ່າຍຄ່າໄຟ 100,000 ກີບ(ຫ້ອງຮຽນມີແອ).',
+                  '- ນັກຮຽນທີ່ມາພັກຫໍພັກໃນ ຈະໄດ້ຊ່ວຍຈ່າຍນ້ຳ, ໄຟ ແລະ ຂີ້ເຫຍື້ອ 200,000 ກີບ/ເທີມ.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _navyLight,
+                    height: 1.6,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '- ນັກຮຽນທຸກຄົນຈະຕ້ອງຮຽນວິຊາ ຄະນິດສາດຄິດໄວ(ພາກບັງຄັບ,ຈັນ-ສຸກ) ຈ່າຍເພີ່ມອີກ 300,000 ກີບ/ເທີມ.',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -1986,23 +2016,27 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
 
   // ── Subject step ───────────────────────────────────────────────────────────
   Widget _buildSubjectStep(List<FeeModel> fees, bool isFeeLoading) {
-    final selectedFees = fees
-        .where((fee) => _selectedFeeIds.contains(fee.feeId))
-        .toList();
+    final selectableFees = fees
+        .where((fee) => !_isMandatorySubject(fee))
+        .toList(growable: false);
+    final selectedFees = _selectedSubjectFees;
 
     return Column(
       key: const ValueKey('subjects'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         FeeSelectionWidget(
-          fees: fees,
+          fees: selectableFees,
           selectedFeeIds: _selectedFeeIds,
           isLoading: isFeeLoading,
           onChanged: _handleFeeSelectionChanged,
         ),
         const SizedBox(height: 20),
         if (selectedFees.isNotEmpty) ...[
-          _sectionLabel('ສະຖານະທຶນ', Icons.workspace_premium_outlined),
+          _sectionLabel(
+            'ລາຍວິຊາທີນັກຮຽນເລືອກ',
+            Icons.workspace_premium_outlined,
+          ),
           const SizedBox(height: 12),
           ...selectedFees.map((fee) {
             final status = _scholarshipStatusByFee[fee.feeId] ?? 'ບໍ່ໄດ້ຮັບທຶນ';
@@ -2096,16 +2130,21 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                   label: 'ຄ່າຮຽນລວມ',
                   value: '${_formatCurrency(_tuitionFee)} ກີບ',
                 ),
-                _SummaryRow(
-                  label: 'ສ່ວນຫຼຸດ($_autoDiscountDescription)',
-                  value: '${_formatCurrency(_selectedDiscountAmount)} ກີບ',
-                ),
+                if (_mandatoryFee > 0)
+                  _SummaryRow(
+                    label: _mandatoryFeeLabel,
+                    value: '${_formatCurrency(_mandatoryFee)} ກີບ',
+                  ),
+
                 if (_dormitoryFee > 0)
                   _SummaryRow(
                     label: _dormitoryFeeLabel,
                     value: '${_formatCurrency(_dormitoryFee)} ກີບ',
                   ),
-
+                _SummaryRow(
+                  label: 'ສ່ວນຫຼຸດ($_autoDiscountDescription)',
+                  value: '${_formatCurrency(_selectedDiscountAmount)} ກີບ',
+                ),
                 const Divider(height: 24),
 
                 _SummaryRow(

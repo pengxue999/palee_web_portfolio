@@ -33,6 +33,8 @@ Future<void> downloadRegistrationReceipt({
   required String studentName,
   required List<FeeModel> selectedFees,
   required int tuitionFee,
+  required String? mandatoryLabel,
+  required int mandatoryFee,
   required String? dormitoryLabel,
   required int dormitoryFee,
   required int totalFee,
@@ -52,6 +54,8 @@ Future<void> downloadRegistrationReceipt({
     studentName: studentName,
     selectedFees: selectedFees,
     tuitionFee: tuitionFee,
+    mandatoryLabel: mandatoryLabel,
+    mandatoryFee: mandatoryFee,
     dormitoryLabel: dormitoryLabel,
     dormitoryFee: dormitoryFee,
     totalFee: totalFee,
@@ -103,6 +107,8 @@ Future<Uint8List> _buildReceiptPdf({
   required String studentName,
   required List<FeeModel> selectedFees,
   required int tuitionFee,
+  required String? mandatoryLabel,
+  required int mandatoryFee,
   required String? dormitoryLabel,
   required int dormitoryFee,
   required int totalFee,
@@ -132,6 +138,8 @@ Future<Uint8List> _buildReceiptPdf({
             )
             .toList(growable: false),
         tuitionFee: tuitionFee,
+        mandatoryLabel: mandatoryLabel,
+        mandatoryFee: mandatoryFee,
         dormitoryLabel: dormitoryLabel,
         dormitoryFee: dormitoryFee,
         totalFee: totalFee,
@@ -155,6 +163,8 @@ Future<Uint8List> _buildReceiptPdf({
     studentName: studentName,
     selectedFees: selectedFees,
     tuitionFee: tuitionFee,
+    mandatoryLabel: mandatoryLabel,
+    mandatoryFee: mandatoryFee,
     dormitoryLabel: dormitoryLabel,
     dormitoryFee: dormitoryFee,
     totalFee: totalFee,
@@ -215,6 +225,8 @@ Future<Uint8List> _buildReceiptImage({
   required String studentName,
   required List<FeeModel> selectedFees,
   required int tuitionFee,
+  required String? mandatoryLabel,
+  required int mandatoryFee,
   required String? dormitoryLabel,
   required int dormitoryFee,
   required int totalFee,
@@ -592,6 +604,58 @@ Future<Uint8List> _buildReceiptImage({
   final summaryValueWidth = 220.0;
   final summaryGap = 26.0;
   final summaryLabelRight = summaryRight - summaryValueWidth - summaryGap;
+
+  paintText(
+    'ຄ່າຮຽນລວມ:',
+    summaryLabelStyle,
+    Offset(summaryLabelRight, summaryY),
+    textAlign: TextAlign.right,
+    maxWidth: 240,
+  );
+  paintText(
+    '${fmt(tuitionFee)} ກີບ',
+    summaryValueStyle,
+    Offset(summaryRight, summaryY),
+    textAlign: TextAlign.right,
+    maxWidth: summaryValueWidth,
+  );
+
+  summaryY += 30;
+  if (mandatoryFee > 0) {
+    paintText(
+      '${mandatoryLabel ?? 'ຄ່າວິຊາບັງຄັບ'}:',
+      summaryLabelStyle,
+      Offset(summaryLabelRight, summaryY),
+      textAlign: TextAlign.right,
+      maxWidth: 240,
+    );
+    paintText(
+      '${fmt(mandatoryFee)} ກີບ',
+      summaryValueStyle,
+      Offset(summaryRight, summaryY),
+      textAlign: TextAlign.right,
+      maxWidth: summaryValueWidth,
+    );
+    summaryY += 30;
+  }
+
+  if (dormitoryFee > 0) {
+    paintText(
+      '${dormitoryLabel ?? 'ຄ່າອື່ນໆ'}:',
+      summaryLabelStyle,
+      Offset(summaryLabelRight, summaryY),
+      textAlign: TextAlign.right,
+      maxWidth: 240,
+    );
+    paintText(
+      '${fmt(dormitoryFee)} ກີບ',
+      summaryValueStyle,
+      Offset(summaryRight, summaryY),
+      textAlign: TextAlign.right,
+      maxWidth: summaryValueWidth,
+    );
+    summaryY += 30;
+  }
 
   paintText(
     'ລວມທັງໝົດ:',
