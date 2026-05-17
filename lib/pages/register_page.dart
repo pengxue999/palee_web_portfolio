@@ -502,60 +502,15 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
       return;
     }
 
-    setState(() => _isLoading = true);
-    try {
-      final isUpdate = _savedStudentId != null;
-      final req = _buildRequest();
-      final ok = !isUpdate
-          ? await ref
-                .read(studentProvider.notifier)
-                .createStudentForRegistration(req)
-          : await ref
-                .read(studentProvider.notifier)
-                .updateStudent(_savedStudentId!, req);
-      ref.read(feeProvider.notifier).getFees();
-      ref.read(discountProvider.notifier).getDiscounts();
-
-      if (!mounted) return;
-      if (!ok) {
-        setState(() => _isLoading = false);
-        _showSnack(
-          _errMsg(
-            ref.read(studentProvider).error ?? 'ເກີດຂໍ້ຜິດພາດໃນການບັນທຶກຂໍ້ມູນ',
-          ),
-          isError: true,
-        );
-        return;
-      }
-      final studentState = ref.read(studentProvider);
-      final student = studentState.selectedStudent;
-      final reusedExistingStudent = studentState.reusedExistingStudent;
-      setState(() {
-        _savedStudentId = student?.studentId ?? _savedStudentId;
-        _isLoading = false;
-        _currentStep = 1;
-      });
-      _stepController.forward(from: 0);
-      _showSnack(
-        !isUpdate
-            ? reusedExistingStudent
-                  ? 'ພົບຂໍ້ມູນນັກຮຽນເກົ່າ ແລະ ນຳໄປລົງທະບຽນຕໍ່ໄດ້ເລີຍ ✓'
-                  : 'ບັນທຶກສຳເລັດ ✓'
-            : 'ອັບເດດສຳເລັດ ✓',
-        isError: false,
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      _showSnack(_errMsg(e), isError: true);
-    }
+    ref.read(feeProvider.notifier).getFees();
+    ref.read(discountProvider.notifier).getDiscounts();
+    setState(() {
+      _currentStep = 1;
+    });
+    _stepController.forward(from: 0);
   }
 
   bool _validateRegistrationPrerequisites() {
-    if (_savedStudentId == null) {
-      _showSnack('ກະລຸນາບັນທຶກຂໍ້ມູນນັກຮຽນກ່ອນ', isError: true);
-      return false;
-    }
     if (_selectedFeeIds.isEmpty) {
       _showSnack('ກະລຸນາເລືອກຢ່າງໜ້ອຍ 1 ວິຊາ', isError: true);
       return false;
@@ -895,9 +850,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
 
     _setReceiptDownloadOverlay(
       isVisible: true,
-      title: 'ກຳລັງບັນທຶກການລົງທະບຽນ',
+      title: 'ກຳລັງບັນທຶກຂໍ້ມູນນັກຮຽນ',
       message:
-          'ກະລຸນາລໍຖ້າຊົ່ວຄາວ. ລະບົບກຳລັງກວດສອບ ແລະ ບັນທຶກຂໍ້ມູນລົງທະບຽນຂອງທ່ານ.',
+          'ກະລຸນາລໍຖ້າຊົ່ວຄາວ. ລະບົບກຳລັງກວດສອບ ແລະ ບັນທຶກຂໍ້ມູນນັກຮຽນຂອງທ່ານ.',
       studentName:
           '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'
               .trim(),
@@ -908,8 +863,51 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
     setState(() => _isLoading = true);
 
     try {
+      // ── Step 1: Create student ──────────────────────────────────────────
+      final studentOk = await ref
+          .read(studentProvider.notifier)
+          .createStudentForRegistration(_buildRequest());
+
+      if (!mounted) return;
+      if (!studentOk) {
+        _setReceiptDownloadOverlay(isVisible: false);
+        setState(() => _isLoading = false);
+        _showSnack(
+          _errMsg(
+            ref.read(studentProvider).error ??
+                'ເກີດຂໍ້ຜິດພາດໃນການບັນທຶກຂໍ້ມູນນັກຮຽນ',
+          ),
+          isError: true,
+        );
+        return;
+      }
+
+      final createdStudentId = ref
+          .read(studentProvider)
+          .selectedStudent
+          ?.studentId;
+      if (createdStudentId == null) {
+        _setReceiptDownloadOverlay(isVisible: false);
+        setState(() => _isLoading = false);
+        _showSnack('ເກີດຂໍ້ຜິດພາດ: ບໍ່ພົບ ID ນັກຮຽນ', isError: true);
+        return;
+      }
+
+      _setReceiptDownloadOverlay(
+        isVisible: true,
+        title: 'ກຳລັງບັນທຶກການລົງທະບຽນ',
+        message:
+            'ກະລຸນາລໍຖ້າຊົ່ວຄາວ. ລະບົບກຳລັງກວດສອບ ແລະ ບັນທຶກຂໍ້ມູນລົງທະບຽນຂອງທ່ານ.',
+        studentName:
+            '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'
+                .trim(),
+      );
+      await WidgetsBinding.instance.endOfFrame;
+      await Future<void>.delayed(const Duration(milliseconds: 16));
+
+      // ── Step 2: Create registration ────────────────────────────────────
       final request = RegistrationRequest(
-        studentId: _savedStudentId!,
+        studentId: createdStudentId,
         discountId: _autoAppliedDiscount?.discountId,
         totalAmount: _totalFee.toDouble(),
         finalAmount: _netFee.toDouble(),
